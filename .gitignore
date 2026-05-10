@@ -1,0 +1,10 @@
+.env.local
+.env
+node_modules/
+.next/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/venv/
+*.pdf
+uploads/

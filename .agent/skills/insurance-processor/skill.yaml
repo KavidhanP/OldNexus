@@ -1,0 +1,9 @@
+name: insurance-comparison-engine
+description: "Extracts and compares insurance premiums from PDFs (2018-2026) using Gemini and Python."
+scripts:
+  - path: scripts/extract_data.py
+  - path: scripts/calculate_deltas.py
+instructions: |
+  1. Use Gemini 1.5 Pro to extract 'premium', 'benefit', and 'clause' fields.
+  2. Use Pandas to calculate the % increase between versioned contracts.
+  3. Flag any increase > 15% as a 'Discrepancy' in the output JSON.

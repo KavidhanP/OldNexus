@@ -1,0 +1,209 @@
+import type { Metadata } from "next";
+import KpiCard from "@/components/dashboard/KpiCard";
+import AssetChart from "@/components/dashboard/AssetChart";
+import { mockKpis, mockMarketData, mockMATargets, mockClients } from "@/lib/mock-data";
+import { formatUSD, stageLabel } from "@/lib/utils";
+import type { MATarget } from "@/types/nexus";
+import { AlertTriangle, ArrowRight, Clock } from "lucide-react";
+import Link from "next/link";
+
+export const metadata: Metadata = { title: "Dashboard" };
+
+function RiskBadge({ score }: { score: number }) {
+  const color =
+    score >= 75
+      ? "bg-red-50 text-red-700 border-red-200"
+      : score >= 50
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : "bg-emerald-50 text-emerald-700 border-emerald-200";
+  return (
+    <span className={`badge border ${color}`}>{score}</span>
+  );
+}
+
+function StagePill({ stage }: { stage: MATarget["stage"] }) {
+  const color: Record<string, string> = {
+    SCREENING: "bg-slate-50 text-slate-600 border-slate-200",
+    INITIAL_DILIGENCE: "bg-blue-50 text-blue-700 border-blue-200",
+    ADVANCED_DILIGENCE: "bg-purple-50 text-purple-700 border-purple-200",
+    NEGOTIATION: "bg-amber-50 text-amber-700 border-amber-200",
+    CLOSING: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    COMPLETED: "bg-green-50 text-green-700 border-green-200",
+    REJECTED: "bg-red-50 text-red-500 border-red-200",
+  };
+  return (
+    <span className={`badge border text-[11px] ${color[stage] ?? ""}`}>
+      {stageLabel(stage)}
+    </span>
+  );
+}
+
+export default function DashboardPage() {
+  const recentActivity = [
+    { label: "Contract extracted", sub: "Prudential Life 2024 — Mohammed Al-Rashid", time: "2m ago", type: "contract" },
+    { label: "Discrepancy flagged", sub: "+34.2% premium creep detected (inflation-adjusted: +18.7%)", time: "2m ago", type: "alert" },
+    { label: "M&A scan complete", sub: "Meridian Life SPA v3 — 4 red flags found", time: "14m ago", type: "audit" },
+    { label: "New client added", sub: "Fatima Al-Mansouri · $55M NW", time: "1h ago", type: "crm" },
+    { label: "Contract extracted", sub: "Old Mutual 2019 — Kwame Asante-Boateng", time: "3h ago", type: "contract" },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* ── Page Header ────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="page-header">Nexus Portal</h1>
+          <p className="page-sub">Unified view of M&A pipeline and HNWI asset performance</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-frost-600">
+          <Clock className="w-3.5 h-3.5" />
+          <span>Data as of 10 May 2026, 02:30 SAST</span>
+        </div>
+      </div>
+
+      {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {mockKpis.map((kpi, i) => (
+          <KpiCard key={kpi.label} kpi={kpi} delay={i * 80} />
+        ))}
+      </div>
+
+      {/* ── Asset Chart + Activity ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2">
+          <AssetChart data={mockMarketData} />
+        </div>
+
+        {/* Activity Feed */}
+        <div className="card p-5">
+          <h2 className="text-base font-semibold text-slate-900 mb-4">Recent Activity</h2>
+          <div className="space-y-3">
+            {recentActivity.map((item, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <div
+                  className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                    item.type === "alert"
+                      ? "bg-red-500"
+                      : item.type === "audit"
+                      ? "bg-amber-500"
+                      : item.type === "crm"
+                      ? "bg-blue-500"
+                      : "bg-burgundy-900"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-700">{item.label}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{item.sub}</p>
+                </div>
+                <span className="text-[10px] text-frost-600 flex-shrink-0 whitespace-nowrap">{item.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── M&A Pipeline Table ─────────────────────────────────────────────── */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-frost-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">M&A Pipeline</h2>
+            <p className="text-xs text-frost-600 mt-0.5">{mockMATargets.length} active targets</p>
+          </div>
+          <Link href="/audit" className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700 transition-colors">
+            View all <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Sector</th>
+                <th>Stage</th>
+                <th>Risk Score</th>
+                <th>EV (USD)</th>
+                <th>Red Flags</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mockMATargets.map((target) => (
+                <tr key={target.id}>
+                  <td className="font-semibold text-slate-800">{target.company_name}</td>
+                  <td className="text-slate-500">{target.sector}</td>
+                  <td><StagePill stage={target.stage} /></td>
+                  <td><RiskBadge score={target.risk_score} /></td>
+                  <td className="tabular-nums">
+                    {target.enterprise_value_usd
+                      ? formatUSD(target.enterprise_value_usd, true)
+                      : <span className="text-slate-400">—</span>}
+                  </td>
+                  <td>
+                    {target.red_flags > 0 ? (
+                      <span className="flex items-center gap-1 text-red-600 font-semibold text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {target.red_flags}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-600 text-xs font-semibold">Clear</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── HNWI Snapshot ─────────────────────────────────────────────────── */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-frost-100">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">HNWI Snapshot</h2>
+            <p className="text-xs text-frost-600 mt-0.5">Top clients by net worth</p>
+          </div>
+          <Link href="/crm" className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700 transition-colors">
+            Open CRM <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Net Worth</th>
+                <th>Risk Profile</th>
+                <th>Contracts</th>
+                <th>RM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mockClients.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <Link href={`/crm/${c.id}`} className="font-semibold text-slate-800 hover:text-burgundy-900 transition-colors">
+                      {c.name}
+                    </Link>
+                  </td>
+                  <td className="tabular-nums font-medium">{formatUSD(c.net_worth_usd, true)}</td>
+                  <td>
+                    <span className={`badge border ${
+                      c.risk_profile === "AGGRESSIVE"
+                        ? "badge-red"
+                        : c.risk_profile === "BALANCED"
+                        ? "badge-amber"
+                        : "badge-green"
+                    }`}>
+                      {c.risk_profile}
+                    </span>
+                  </td>
+                  <td className="tabular-nums">{c.contract_count}</td>
+                  <td className="text-slate-500">{c.relationship_manager}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
