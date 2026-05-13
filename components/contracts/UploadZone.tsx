@@ -13,11 +13,11 @@ interface UploadedFile {
 }
 
 interface UploadZoneProps {
-  onFilesReady?: (files: File[]) => void;
+  onUploadSuccess?: (extractedData: any) => void;
   maxFiles?: number;
 }
 
-export default function UploadZone({ onFilesReady, maxFiles = 10 }: UploadZoneProps) {
+export default function UploadZone({ onUploadSuccess, maxFiles = 10 }: UploadZoneProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
 
   const onDrop = useCallback(
@@ -29,31 +29,60 @@ export default function UploadZone({ onFilesReady, maxFiles = 10 }: UploadZonePr
         progress: 0,
       }));
       setFiles((prev) => [...prev, ...newFiles].slice(0, maxFiles));
-      onFilesReady?.(accepted);
 
-      // Simulate upload progress
-      newFiles.forEach((uf, idx) => {
-        setTimeout(() => {
-          setFiles((prev) =>
-            prev.map((f) => (f.id === uf.id ? { ...f, status: "uploading" } : f))
-          );
+      // Actual Upload
+      newFiles.forEach(async (uf) => {
+        setFiles((prev) =>
+          prev.map((f) => (f.id === uf.id ? { ...f, status: "uploading", progress: 20 } : f))
+        );
+
+        const formData = new FormData();
+        formData.append("file", uf.file);
+
+        try {
+          // Fake progress for UI feel while Gemini processes
           const interval = setInterval(() => {
             setFiles((prev) =>
               prev.map((f) => {
-                if (f.id !== uf.id) return f;
-                const newProgress = Math.min(f.progress + Math.random() * 25, 100);
-                if (newProgress >= 100) {
-                  clearInterval(interval);
-                  return { ...f, progress: 100, status: "done" };
-                }
+                if (f.id !== uf.id || f.status !== "uploading") return f;
+                const newProgress = Math.min(f.progress + 5, 90); // Cap at 90% until done
                 return { ...f, progress: newProgress };
               })
             );
-          }, 200);
-        }, idx * 300);
+          }, 500);
+
+          const res = await fetch("http://127.0.0.1:8000/contracts/extract", {
+            method: "POST",
+            body: formData,
+          });
+
+          clearInterval(interval);
+
+          if (!res.ok) {
+            const errorBody = await res.text();
+            console.error("Backend error:", res.status, errorBody);
+            throw new Error(`Upload failed (${res.status}): ${errorBody}`);
+          }
+          
+          const result = await res.json();
+          
+          setFiles((prev) =>
+            prev.map((f) => (f.id === uf.id ? { ...f, status: "done", progress: 100 } : f))
+          );
+
+          if (onUploadSuccess && result.data) {
+            onUploadSuccess(result.data);
+          }
+
+        } catch (error) {
+          console.error("Upload error:", error);
+          setFiles((prev) =>
+            prev.map((f) => (f.id === uf.id ? { ...f, status: "error" } : f))
+          );
+        }
       });
     },
-    [maxFiles, onFilesReady]
+    [maxFiles, onUploadSuccess]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

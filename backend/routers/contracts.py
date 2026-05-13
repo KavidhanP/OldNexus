@@ -38,6 +38,8 @@ async def extract_endpoint(file: UploadFile = File(...)) -> JSONResponse:
     try:
         extracted = extract_contract(tmp_path)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
     finally:
         os.unlink(tmp_path)

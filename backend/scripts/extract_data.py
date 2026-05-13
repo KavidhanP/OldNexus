@@ -15,7 +15,8 @@ import google.generativeai as genai
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent.parent / ".env.local")
+load_dotenv() # Also load standard .env if exists
 
 # ── Configure Gemini ──────────────────────────────────────────────────────────
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
@@ -99,7 +100,7 @@ def extract_contract(pdf_path: str) -> dict:
     prompt = build_prompt(raw_text)
 
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-2.0-flash",
         generation_config={
             "temperature": 0.1,  # Low temp for deterministic extraction
             "response_mime_type": "application/json",
@@ -121,7 +122,7 @@ def extract_contract(pdf_path: str) -> dict:
 
     # Attach source metadata
     result["_source_file"] = str(pdf_path)
-    result["_extraction_model"] = "gemini-1.5-pro"
+    result["_extraction_model"] = "gemini-2.0-flash"
 
     return result
 

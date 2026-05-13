@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useState } from "react";
 import UploadZone from "@/components/contracts/UploadZone";
 import { FileText, GitCompare, CheckCircle, Clock, AlertTriangle, ArrowRight } from "lucide-react";
 import Link from "next/link";
-
-export const metadata: Metadata = { title: "Contracts" };
 
 const mockContracts = [
   { id: "ctr-2018-001", name: "Prudential Life — Whole Life 2018", carrier: "Prudential Life", year: 2018, client: "Mohammed Al-Rashid", status: "EXTRACTED", premium: 48000 },
@@ -37,6 +37,23 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function ContractsPage() {
+  const [contracts, setContracts] = useState(mockContracts);
+
+  const handleUploadSuccess = (extractedData: any) => {
+    const newContract = {
+      id: extractedData.id || `ctr-new-${Date.now()}`,
+      name: extractedData.original_filename || "Newly Uploaded Contract",
+      carrier: extractedData.carrier || "Unknown Carrier",
+      year: extractedData.policy_year || new Date().getFullYear(),
+      client: "New Client", // Could be extracted or assigned later
+      status: "EXTRACTED",
+      premium: extractedData.premium_amount || null,
+    };
+    
+    // Add to the top of the list
+    setContracts((prev) => [newContract, ...prev]);
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -53,7 +70,7 @@ export default function ContractsPage() {
               <FileText className="w-4 h-4 text-burgundy-900" />
               Upload Contracts
             </h2>
-            <UploadZone />
+              <UploadZone onUploadSuccess={handleUploadSuccess} />
           </div>
 
           {/* Quick stats */}
@@ -93,7 +110,7 @@ export default function ContractsPage() {
                 </tr>
               </thead>
               <tbody>
-                {mockContracts.map((c) => (
+                {contracts.map((c) => (
                   <tr key={c.id}>
                     <td className="font-medium text-slate-800 max-w-[160px] truncate">{c.name}</td>
                     <td className="text-slate-500">{c.carrier}</td>

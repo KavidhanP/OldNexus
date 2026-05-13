@@ -10,7 +10,7 @@ from backend.routers import contracts, audit
 app = FastAPI(
     title="Nexus OS API",
     description="Insurance Premium Discrepancy Engine & M&A Red Flag Scanner",
-    version="1.0.0",
+    version="1.0.0.0 v.sewpaul",
 )
 
 # Allow Next.js dev server to call this API
