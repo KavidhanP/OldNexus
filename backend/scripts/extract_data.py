@@ -11,15 +11,15 @@ Uses:
 import os
 import json
 import pdfplumber
-import google.generativeai as genai
+from groq import Groq
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env.local")
 load_dotenv() # Also load standard .env if exists
 
-# ── Configure Gemini ──────────────────────────────────────────────────────────
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+# ── Configure Groq ────────────────────────────────────────────────────────────
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "insurance_extractor.txt"
 
@@ -96,21 +96,19 @@ def extract_contract(pdf_path: str) -> dict:
     if not raw_text.strip():
         raise ValueError(f"No extractable text found in PDF: {pdf_path}")
 
-    # Step 2: Build prompt and call Gemini
+    # Step 2: Build prompt and call Groq
     prompt = build_prompt(raw_text)
 
-    model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
-        generation_config={
-            "temperature": 0.1,  # Low temp for deterministic extraction
-            "response_mime_type": "application/json",
-        },
-        # Enterprise privacy: no training data opt-in
-        # system_instruction is not yet supported in Python SDK v0.7; embedded in prompt
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.1,
+        response_format={"type": "json_object"},
     )
 
-    response = model.generate_content(prompt)
-    raw_json = response.text.strip()
+    raw_json = response.choices[0].message.content.strip()
 
     # Step 3: Parse
     try:
@@ -122,7 +120,7 @@ def extract_contract(pdf_path: str) -> dict:
 
     # Attach source metadata
     result["_source_file"] = str(pdf_path)
-    result["_extraction_model"] = "gemini-2.0-flash"
+    result["_extraction_model"] = "llama-3.3-70b-versatile"
 
     return result
 

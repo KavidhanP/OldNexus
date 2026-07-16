@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/shell/Sidebar";
 import TopBar from "@/components/shell/TopBar";
+import { NexusProvider } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: {
@@ -29,17 +30,19 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-frost antialiased">
-        <Sidebar />
-        <TopBar />
-        <main
-          className="min-h-screen"
-          style={{
-            marginLeft: "var(--sidebar-width)",
-            paddingTop: "var(--topbar-height)",
-          }}
-        >
-          <div className="p-6 animate-fade-in">{children}</div>
-        </main>
+        <NexusProvider>
+          <Sidebar />
+          <TopBar />
+          <main
+            className="min-h-screen"
+            style={{
+              marginLeft: "var(--sidebar-width)",
+              paddingTop: "var(--topbar-height)",
+            }}
+          >
+            <div className="p-6 animate-fade-in">{children}</div>
+          </main>
+        </NexusProvider>
       </body>
     </html>
   );

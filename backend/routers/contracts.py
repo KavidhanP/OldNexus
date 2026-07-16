@@ -60,28 +60,32 @@ async def extract_endpoint(file: UploadFile = File(...)) -> JSONResponse:
 
 @router.post("/compare")
 async def compare_endpoint(
-    contract_a_id: str = Form(...),
-    contract_b_id: str = Form(...),
+    contract_a: str = Form(...),
+    contract_b: str = Form(...),
 ) -> JSONResponse:
     """
-    Compare two previously extracted contracts and return a delta report.
+    Compare two extracted contracts and return a delta report.
+    Accepts full contract JSON strings directly — no in-memory lookup required.
     Flags any inflation-adjusted premium increase > 15% as DISCREPANCY.
     """
-    contract_a = _extracted_contracts.get(contract_a_id)
-    contract_b = _extracted_contracts.get(contract_b_id)
-
-    if not contract_a:
-        raise HTTPException(status_code=404, detail=f"Contract {contract_a_id} not found.")
-    if not contract_b:
-        raise HTTPException(status_code=404, detail=f"Contract {contract_b_id} not found.")
+    import json as _json
 
     try:
-        delta_report = calculate_deltas(contract_a, contract_b)
+        data_a = _json.loads(contract_a)
+        data_b = _json.loads(contract_b)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid contract JSON payload.")
+
+    try:
+        delta_report = calculate_deltas(data_a, data_b)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delta calculation failed: {str(e)}")
 
     report_id = str(uuid.uuid4())
     delta_report["id"] = report_id
+    delta_report["contract_a_id"] = data_a.get("id", "")
+    delta_report["contract_b_id"] = data_b.get("id", "")
+    delta_report["generated_at"] = __import__("datetime").datetime.utcnow().isoformat() + "Z"
 
     return JSONResponse(
         content={

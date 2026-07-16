@@ -12,11 +12,11 @@ from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from pathlib import Path
 import pdfplumber
-import google.generativeai as genai
+from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "ma_redflags.txt"
 
@@ -63,22 +63,23 @@ Total Pages: {total_pages}
 ## Task:
 Scan the document for all red flag clauses as defined in your instructions.
 When referencing page numbers, use the [PAGE N] markers in the text above.
-Return ONLY a JSON array of red flag objects. No explanation, no markdown fences.
-If no red flags exist, return an empty array: []
+Return ONLY a JSON object with a single key 'flags' containing an array of red flag objects. No explanation, no markdown fences.
+If no red flags exist, return: {{"flags": []}}
 """
 
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
-        generation_config={
-            "temperature": 0.1,
-            "response_mime_type": "application/json",
-        },
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.1,
+        response_format={"type": "json_object"},
     )
 
-    response = model.generate_content(prompt)
-    raw_json = response.text.strip().strip("`").lstrip("json\n").strip()
+    raw_json = response.choices[0].message.content.strip()
 
-    results = json.loads(raw_json)
+    parsed = json.loads(raw_json)
+    results = parsed.get("flags", [])
 
     # Sort by risk level
     results.sort(key=lambda r: RISK_ORDER.get(r.get("risk_level", "LOW"), 99))

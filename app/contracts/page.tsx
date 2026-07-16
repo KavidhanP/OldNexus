@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useNexus } from "@/lib/store";
+import type { ExtractedContractEntry } from "@/lib/store";
+import type { DeltaReport } from "@/types/nexus";
 import UploadZone from "@/components/contracts/UploadZone";
-import { FileText, GitCompare, CheckCircle, Clock, AlertTriangle, ArrowRight } from "lucide-react";
+import {
+  FileText, GitCompare, CheckCircle, Clock, AlertTriangle,
+  ArrowRight, Loader2, ChevronRight, Scale,
+} from "lucide-react";
 import Link from "next/link";
 
-const mockContracts = [
-  { id: "ctr-2018-001", name: "Prudential Life — Whole Life 2018", carrier: "Prudential Life", year: 2018, client: "Mohammed Al-Rashid", status: "EXTRACTED", premium: 48000 },
-  { id: "ctr-2024-001", name: "Prudential Life — Whole Life 2024", carrier: "Prudential Life", year: 2024, client: "Mohammed Al-Rashid", status: "COMPARED", premium: 64416 },
-  { id: "ctr-2019-002", name: "Old Mutual — Endowment 2019", carrier: "Old Mutual", year: 2019, client: "Kwame Asante-Boateng", status: "EXTRACTED", premium: 72000 },
-  { id: "ctr-2023-003", name: "Discovery Life — Income Protector 2023", carrier: "Discovery Life", year: 2023, client: "Adaeze Okonkwo", status: "PENDING", premium: null },
-  { id: "ctr-2021-004", name: "Liberty Life — Term 20 2021", carrier: "Liberty Life", year: 2021, client: "Fatima Al-Mansouri", status: "EXTRACTED", premium: 38400 },
-];
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -37,50 +38,193 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function ContractsPage() {
-  const [contracts, setContracts] = useState(mockContracts);
+  const { state, addContract, addDeltaReport } = useNexus();
+  const { contracts, deltaReports } = state;
+  const router = useRouter();
 
-  const handleUploadSuccess = (extractedData: any) => {
-    const newContract = {
-      id: extractedData.id || `ctr-new-${Date.now()}`,
-      name: extractedData.original_filename || "Newly Uploaded Contract",
-      carrier: extractedData.carrier || "Unknown Carrier",
-      year: extractedData.policy_year || new Date().getFullYear(),
-      client: "New Client", // Could be extracted or assigned later
-      status: "EXTRACTED",
-      premium: extractedData.premium_amount || null,
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [comparing, setComparing] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+
+  // ── Handle upload success ─────────────────────────────────────────────────
+  const handleUploadSuccess = (raw: Record<string, unknown>) => {
+    const entry: ExtractedContractEntry = {
+      id: (raw.id as string) ?? `ctr-${Date.now()}`,
+      original_filename: (raw.original_filename as string) ?? "Uploaded Contract",
+      carrier: (raw.carrier as string) ?? null,
+      policy_year: (raw.policy_year as number) ?? null,
+      premium_amount: (raw.premium_amount as number) ?? null,
+      policy_type: (raw.policy_type as string) ?? null,
+      sum_assured: (raw.sum_assured as number) ?? null,
+      extractedAt: new Date().toISOString(),
+      raw,
     };
-    
-    // Add to the top of the list
-    setContracts((prev) => [newContract, ...prev]);
+    addContract(entry);
   };
+
+  // ── Toggle row selection ──────────────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        if (next.size >= 2) {
+          // Keep only the latest selected + this new one
+          const arr = Array.from(next);
+          next.clear();
+          next.add(arr[arr.length - 1]);
+        }
+        next.add(id);
+      }
+      return next;
+    });
+    setCompareError(null);
+  };
+
+  // ── Run comparison ────────────────────────────────────────────────────────
+  const runCompare = async () => {
+    const [idA, idB] = Array.from(selectedIds);
+    if (!idA || !idB) return;
+
+    const cA = contracts.find((c) => c.id === idA);
+    const cB = contracts.find((c) => c.id === idB);
+    if (!cA || !cB) {
+      setCompareError("Could not find selected contracts. Please re-upload them.");
+      return;
+    }
+
+    setComparing(true);
+    setCompareError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("contract_a", JSON.stringify(cA.raw));
+      formData.append("contract_b", JSON.stringify(cB.raw));
+
+      const res = await fetch(`${API}/contracts/compare`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Compare failed (${res.status}): ${errText}`);
+      }
+
+      const json = await res.json();
+      const report: DeltaReport = json.data;
+      await addDeltaReport(report);
+
+      // Use router.push so React context stays alive (no full page reload)
+      router.push(`/contracts/compare/${report.id}`);
+    } catch (err: unknown) {
+      setCompareError(err instanceof Error ? err.message : "Comparison failed.");
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  const contractA = contracts.find((c) => selectedIds.has(c.id));
+  const contractB = contracts.find((c) => selectedIds.has(c.id) && c.id !== contractA?.id);
+  const canCompare = selectedIds.size === 2;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>
         <h1 className="page-header">Versioned Contract Engine</h1>
-        <p className="page-sub">Upload PDF contracts (2018–2026) for AI extraction and premium delta analysis</p>
+        <p className="page-sub">Upload PDF contracts for AI extraction and premium delta analysis</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Upload zone */}
+        {/* Left column */}
         <div className="xl:col-span-1 space-y-4">
+          {/* Upload zone */}
           <div className="card p-5">
             <h2 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
               <FileText className="w-4 h-4 text-burgundy-900" />
               Upload Contracts
             </h2>
-              <UploadZone onUploadSuccess={handleUploadSuccess} />
+            <UploadZone onUploadSuccess={handleUploadSuccess} />
           </div>
 
-          {/* Quick stats */}
+          {/* Compare panel */}
+          {contracts.length >= 2 && (
+            <div className="card p-5 space-y-3 animate-fade-in">
+              <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <Scale className="w-4 h-4 text-burgundy-900" />
+                Compare Contracts
+              </h2>
+              <p className="text-xs text-frost-600">
+                Select exactly <strong>2 contracts</strong> from the table to generate a premium delta report.
+              </p>
+
+              {canCompare && (
+                <div className="text-xs text-slate-700 space-y-1">
+                  <p className="font-medium text-slate-500">Selected:</p>
+                  <p className="truncate">A: {contractA?.original_filename}</p>
+                  <p className="truncate">B: {contractB?.original_filename}</p>
+                </div>
+              )}
+
+              {compareError && (
+                <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{compareError}</p>
+              )}
+
+              <button
+                onClick={runCompare}
+                disabled={!canCompare || comparing}
+                className="btn-primary w-full flex items-center justify-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {comparing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Running Analysis…
+                  </>
+                ) : (
+                  <>
+                    <GitCompare className="w-4 h-4" /> Generate Delta Report
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Past delta reports */}
+          {deltaReports.length > 0 && (
+            <div className="card p-5 space-y-2 animate-fade-in">
+              <h2 className="text-sm font-semibold text-slate-800 mb-3">Delta Reports</h2>
+              {deltaReports.map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/contracts/compare/${r.id}`}
+                  className="flex items-center justify-between p-2.5 rounded-xl hover:bg-frost-50 transition-colors group"
+                >
+                  <div>
+                    <p className="text-xs font-semibold text-slate-700">
+                      {r.carrier_a} · {r.contract_a_year} vs {r.contract_b_year}
+                    </p>
+                    <p className="text-[11px] text-frost-600 mt-0.5">
+                      {r.summary.discrepancies} discrepanc{r.summary.discrepancies !== 1 ? "ies" : "y"}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-frost-400 group-hover:text-burgundy-900 transition-colors" />
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Stats */}
           <div className="card p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-slate-800">Extraction Stats</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Session Stats</h2>
             {[
-              { label: "Total Uploaded", value: "247", color: "bg-burgundy-900" },
-              { label: "Successfully Extracted", value: "231", color: "bg-emerald-500" },
-              { label: "Discrepancies Found", value: "38", color: "bg-red-500" },
-              { label: "Pending Processing", value: "16", color: "bg-amber-400" },
+              { label: "Contracts Extracted", value: contracts.length, color: "bg-burgundy-900" },
+              { label: "Delta Reports Generated", value: deltaReports.length, color: "bg-purple-500" },
+              {
+                label: "Discrepancies Found",
+                value: deltaReports.reduce((acc, r) => acc + r.summary.discrepancies, 0),
+                color: "bg-red-500",
+              },
             ].map((s) => (
               <div key={s.label} className="flex items-center gap-3">
                 <span className={`w-2 h-2 rounded-full ${s.color}`} />
@@ -93,50 +237,101 @@ export default function ContractsPage() {
 
         {/* Contract history table */}
         <div className="xl:col-span-2 card overflow-hidden">
-          <div className="px-5 py-4 border-b border-frost-100">
-            <h2 className="text-sm font-semibold text-slate-800">Contract History</h2>
+          <div className="px-5 py-4 border-b border-frost-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">
+              Contract History
+              {contracts.length > 0 && (
+                <span className="ml-2 text-xs text-frost-500 font-normal">
+                  — click rows to select for comparison
+                </span>
+              )}
+            </h2>
+            {contracts.length > 0 && (
+              <span className="text-xs text-frost-500">{contracts.length} contract{contracts.length !== 1 ? "s" : ""}</span>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Contract</th>
-                  <th>Carrier</th>
-                  <th>Year</th>
-                  <th>Client</th>
-                  <th>Premium (p.a.)</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {contracts.map((c) => (
-                  <tr key={c.id}>
-                    <td className="font-medium text-slate-800 max-w-[160px] truncate">{c.name}</td>
-                    <td className="text-slate-500">{c.carrier}</td>
-                    <td className="tabular-nums">{c.year}</td>
-                    <td className="text-slate-600">{c.client}</td>
-                    <td className="tabular-nums">
-                      {c.premium
-                        ? `$${c.premium.toLocaleString("en-US")}`
-                        : <span className="text-slate-400">—</span>}
-                    </td>
-                    <td><StatusBadge status={c.status} /></td>
-                    <td>
-                      {c.status === "COMPARED" && (
-                        <Link
-                          href={`/contracts/compare/dr-001`}
-                          className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700"
-                        >
-                          View Report <ArrowRight className="w-3 h-3" />
-                        </Link>
-                      )}
-                    </td>
+
+          {contracts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <div className="w-14 h-14 rounded-2xl bg-frost-50 flex items-center justify-center mb-4">
+                <FileText className="w-7 h-7 text-frost-400" />
+              </div>
+              <p className="text-sm font-semibold text-slate-600">No contracts yet</p>
+              <p className="text-xs text-frost-500 mt-1 max-w-xs">
+                Upload a PDF insurance contract using the panel on the left. Groq will extract all key fields automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-8"></th>
+                    <th>Contract</th>
+                    <th>Carrier</th>
+                    <th>Year</th>
+                    <th>Premium (p.a.)</th>
+                    <th>Status</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {contracts.map((c) => {
+                    const isSelected = selectedIds.has(c.id);
+                    return (
+                      <tr
+                        key={c.id}
+                        onClick={() => toggleSelect(c.id)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected
+                            ? "bg-burgundy-900/5 border-l-2 border-l-burgundy-900"
+                            : "hover:bg-frost-50"
+                        }`}
+                      >
+                        <td>
+                          <div
+                            className={`w-4 h-4 rounded border-2 transition-colors ${
+                              isSelected
+                                ? "bg-burgundy-900 border-burgundy-900"
+                                : "border-frost-300"
+                            }`}
+                          />
+                        </td>
+                        <td className="font-medium text-slate-800 max-w-[200px] truncate">
+                          {c.original_filename}
+                        </td>
+                        <td className="text-slate-500">{c.carrier ?? "—"}</td>
+                        <td className="tabular-nums">{c.policy_year ?? "—"}</td>
+                        <td className="tabular-nums">
+                          {c.premium_amount
+                            ? `$${c.premium_amount.toLocaleString("en-US")}`
+                            : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td><StatusBadge status="EXTRACTED" /></td>
+                        <td>
+                          {deltaReports.some(
+                            (r) => r.contract_a_id === c.id || r.contract_b_id === c.id
+                          ) && (
+                            <Link
+                              href={`/contracts/compare/${
+                                deltaReports.find(
+                                  (r) => r.contract_a_id === c.id || r.contract_b_id === c.id
+                                )?.id
+                              }`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700"
+                            >
+                              View Report <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
