@@ -22,12 +22,7 @@ interface NavItem {
   badge?: string;
 }
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Contracts", href: "/contracts", icon: FileText, badge: "247" },
-  { label: "Fortress CRM", href: "/crm", icon: Users },
-  { label: "M&A Audit", href: "/audit", icon: Search, badge: "4" },
-];
+import { useNexus } from "@/lib/store";
 
 const secondaryItems: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
@@ -35,6 +30,14 @@ const secondaryItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { state } = useNexus();
+  
+  const navItems: NavItem[] = [
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Contracts", href: "/contracts", icon: FileText, badge: state.contracts.length > 0 ? String(state.contracts.length) : undefined },
+    { label: "Fortress CRM", href: "/crm", icon: Users },
+    { label: "M&A Audit", href: "/audit", icon: Search, badge: state.auditScans.length > 0 ? String(state.auditScans.length) : undefined },
+  ];
 
   return (
     <aside

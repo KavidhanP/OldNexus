@@ -3,7 +3,7 @@
 import { useNexus } from "@/lib/store";
 import KpiCard from "@/components/dashboard/KpiCard";
 import AssetChart from "@/components/dashboard/AssetChart";
-import { mockMarketData, mockMATargets, mockClients } from "@/lib/mock-data";
+import { formatUSD, stageLabel } from "@/lib/utils";
 import { formatUSD, stageLabel } from "@/lib/utils";
 import type { MATarget, KpiData } from "@/types/nexus";
 import { AlertTriangle, ArrowRight, Clock, FileText, TrendingUp, Users } from "lucide-react";
@@ -171,119 +171,51 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── M&A Pipeline Table ──────────────────────────────────────────── */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-frost-100">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">M&A Pipeline</h2>
-            <p className="text-xs text-frost-600 mt-0.5">{mockMATargets.length} active targets</p>
+      {/* ── Live Contracts Table ──────────────────────────────────────────── */}
+      {contracts.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-frost-100">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Recent Contracts</h2>
+              <p className="text-xs text-frost-600 mt-0.5">Latest extracted documents</p>
+            </div>
+            <Link
+              href="/contracts"
+              className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700 transition-colors"
+            >
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <Link
-            href="/audit"
-            className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700 transition-colors"
-          >
-            Run Audit <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Sector</th>
-                <th>Stage</th>
-                <th>Risk Score</th>
-                <th>EV (USD)</th>
-                <th>Red Flags</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockMATargets.map((target) => (
-                <tr key={target.id}>
-                  <td className="font-semibold text-slate-800">{target.company_name}</td>
-                  <td className="text-slate-500">{target.sector}</td>
-                  <td><StagePill stage={target.stage} /></td>
-                  <td><RiskBadge score={target.risk_score} /></td>
-                  <td className="tabular-nums">
-                    {target.enterprise_value_usd
-                      ? formatUSD(target.enterprise_value_usd, true)
-                      : <span className="text-slate-400">—</span>}
-                  </td>
-                  <td>
-                    {target.red_flags > 0 ? (
-                      <span className="flex items-center gap-1 text-red-600 font-semibold text-xs">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        {target.red_flags}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-600 text-xs font-semibold">Clear</span>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Carrier</th>
+                  <th>Policy Type</th>
+                  <th>Year</th>
+                  <th>Premium</th>
+                  <th>Sum Assured</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── HNWI Snapshot ───────────────────────────────────────────────── */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-frost-100">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">HNWI Snapshot</h2>
-            <p className="text-xs text-frost-600 mt-0.5">Top clients by net worth</p>
+              </thead>
+              <tbody>
+                {contracts.slice(0, 5).map((c) => (
+                  <tr key={c.id}>
+                    <td className="font-semibold text-slate-800">{c.carrier || "Unknown"}</td>
+                    <td className="text-slate-600">{c.policy_type || "—"}</td>
+                    <td className="text-slate-600">{c.policy_year || "—"}</td>
+                    <td className="tabular-nums font-medium text-slate-900">
+                      {c.premium_amount ? formatUSD(c.premium_amount, false) : "—"}
+                    </td>
+                    <td className="tabular-nums">
+                      {c.sum_assured ? formatUSD(c.sum_assured, true) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <Link
-            href="/crm"
-            className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700 transition-colors"
-          >
-            Open CRM <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Net Worth</th>
-                <th>Risk Profile</th>
-                <th>Contracts</th>
-                <th>RM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockClients.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <Link
-                      href={`/crm/${c.id}`}
-                      className="font-semibold text-slate-800 hover:text-burgundy-900 transition-colors"
-                    >
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td className="tabular-nums font-medium">{formatUSD(c.net_worth_usd, true)}</td>
-                  <td>
-                    <span
-                      className={`badge border ${
-                        c.risk_profile === "AGGRESSIVE"
-                          ? "badge-red"
-                          : c.risk_profile === "BALANCED"
-                          ? "badge-amber"
-                          : "badge-green"
-                      }`}
-                    >
-                      {c.risk_profile}
-                    </span>
-                  </td>
-                  <td className="tabular-nums">{c.contract_count}</td>
-                  <td className="text-slate-500">{c.relationship_manager}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
