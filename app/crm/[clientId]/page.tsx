@@ -7,11 +7,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 interface PageProps {
-  params: { clientId: string };
+  params: Promise<{ clientId: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const client = mockClients.find((c) => c.id === params.clientId);
+  const { clientId } = await params;
+  const client = mockClients.find((c) => c.id === clientId);
   return { title: client ? client.name : "Client" };
 }
 
@@ -22,8 +23,9 @@ const ASSET_COLORS: Record<string, string> = {
   CASH: "#94a3b8",
 };
 
-export default function ClientDetailPage({ params }: PageProps) {
-  const client = mockClients.find((c) => c.id === params.clientId);
+export default async function ClientDetailPage({ params }: PageProps) {
+  const { clientId } = await params;
+  const client = mockClients.find((c) => c.id === clientId);
   if (!client) notFound();
 
   const topAsset = [...client.allocations].sort((a, b) => b.percentage - a.percentage)[0];

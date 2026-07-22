@@ -15,6 +15,7 @@ import pdfplumber
 from groq import Groq
 from dotenv import load_dotenv
 
+load_dotenv(Path(__file__).parent.parent.parent / ".env.local")
 load_dotenv()
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 

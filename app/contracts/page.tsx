@@ -8,7 +8,7 @@ import type { DeltaReport } from "@/types/nexus";
 import UploadZone from "@/components/contracts/UploadZone";
 import {
   FileText, GitCompare, CheckCircle, Clock, AlertTriangle,
-  ArrowRight, Loader2, ChevronRight, Scale,
+  ArrowRight, Loader2, ChevronRight, Scale, Search,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -45,6 +45,7 @@ export default function ContractsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
+  const [contractSearch, setContractSearch] = useState("");
 
   // ── Handle upload success ─────────────────────────────────────────────────
   const handleUploadSuccess = (raw: Record<string, unknown>) => {
@@ -237,17 +238,30 @@ export default function ContractsPage() {
 
         {/* Contract history table */}
         <div className="xl:col-span-2 card overflow-hidden">
-          <div className="px-5 py-4 border-b border-frost-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">
-              Contract History
-              {contracts.length > 0 && (
-                <span className="ml-2 text-xs text-frost-500 font-normal">
-                  — click rows to select for comparison
-                </span>
-              )}
-            </h2>
+          <div className="px-5 py-4 border-b border-frost-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">
+                Contract History
+                {contracts.length > 0 && (
+                  <span className="ml-2 text-xs text-frost-500 font-normal">
+                    — select 2 for comparison
+                  </span>
+                )}
+              </h2>
+            </div>
+            
             {contracts.length > 0 && (
-              <span className="text-xs text-frost-500">{contracts.length} contract{contracts.length !== 1 ? "s" : ""}</span>
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-frost-400" />
+                <input
+                  type="search"
+                  value={contractSearch}
+                  onChange={(e) => setContractSearch(e.target.value)}
+                  placeholder="Filter contracts..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-frost-200 bg-white text-xs text-slate-700
+                             placeholder:text-frost-400 focus:outline-none focus:border-burgundy-900"
+                />
+              </div>
             )}
           </div>
 
@@ -266,7 +280,7 @@ export default function ContractsPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="w-8"></th>
+                    <th className="w-8">Select</th>
                     <th>Contract</th>
                     <th>Carrier</th>
                     <th>Year</th>
@@ -276,58 +290,63 @@ export default function ContractsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {contracts.map((c) => {
-                    const isSelected = selectedIds.has(c.id);
-                    return (
-                      <tr
-                        key={c.id}
-                        onClick={() => toggleSelect(c.id)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected
-                            ? "bg-burgundy-900/5 border-l-2 border-l-burgundy-900"
-                            : "hover:bg-frost-50"
-                        }`}
-                      >
-                        <td>
-                          <div
-                            className={`w-4 h-4 rounded border-2 transition-colors ${
-                              isSelected
-                                ? "bg-burgundy-900 border-burgundy-900"
-                                : "border-frost-300"
-                            }`}
-                          />
-                        </td>
-                        <td className="font-medium text-slate-800 max-w-[200px] truncate">
-                          {c.original_filename}
-                        </td>
-                        <td className="text-slate-500">{c.carrier ?? "—"}</td>
-                        <td className="tabular-nums">{c.policy_year ?? "—"}</td>
-                        <td className="tabular-nums">
-                          {c.premium_amount
-                            ? `$${c.premium_amount.toLocaleString("en-US")}`
-                            : <span className="text-slate-400">—</span>}
-                        </td>
-                        <td><StatusBadge status="EXTRACTED" /></td>
-                        <td>
-                          {deltaReports.some(
-                            (r) => r.contract_a_id === c.id || r.contract_b_id === c.id
-                          ) && (
-                            <Link
-                              href={`/contracts/compare/${
-                                deltaReports.find(
-                                  (r) => r.contract_a_id === c.id || r.contract_b_id === c.id
-                                )?.id
-                              }`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700"
-                            >
-                              View Report <ArrowRight className="w-3 h-3" />
-                            </Link>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {contracts
+                    .filter(
+                      (c) =>
+                        c.original_filename.toLowerCase().includes(contractSearch.toLowerCase()) ||
+                        (c.carrier && c.carrier.toLowerCase().includes(contractSearch.toLowerCase()))
+                    )
+                    .map((c) => {
+                      const isSelected = selectedIds.has(c.id);
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => toggleSelect(c.id)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-burgundy-900/5 border-l-2 border-l-burgundy-900"
+                              : "hover:bg-frost-50"
+                          }`}
+                        >
+                          <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelect(c.id)}
+                              className="w-4 h-4 rounded text-burgundy-900 focus:ring-burgundy-900 cursor-pointer"
+                            />
+                          </td>
+                          <td className="font-medium text-slate-800 max-w-[200px] truncate">
+                            {c.original_filename}
+                          </td>
+                          <td className="text-slate-500">{c.carrier ?? "—"}</td>
+                          <td className="tabular-nums">{c.policy_year ?? "—"}</td>
+                          <td className="tabular-nums">
+                            {c.premium_amount
+                              ? `$${c.premium_amount.toLocaleString("en-US")}`
+                              : <span className="text-slate-400">—</span>}
+                          </td>
+                          <td><StatusBadge status="EXTRACTED" /></td>
+                          <td>
+                            {deltaReports.some(
+                              (r) => r.contract_a_id === c.id || r.contract_b_id === c.id
+                            ) && (
+                              <Link
+                                href={`/contracts/compare/${
+                                  deltaReports.find(
+                                    (r) => r.contract_a_id === c.id || r.contract_b_id === c.id
+                                  )?.id
+                                }`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-xs font-medium text-burgundy-900 hover:text-burgundy-700"
+                              >
+                                View Report <ArrowRight className="w-3 h-3" />
+                              </Link>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

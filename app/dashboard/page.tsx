@@ -4,7 +4,7 @@ import { useNexus } from "@/lib/store";
 import KpiCard from "@/components/dashboard/KpiCard";
 import AssetChart from "@/components/dashboard/AssetChart";
 import { formatUSD, stageLabel } from "@/lib/utils";
-import { formatUSD, stageLabel } from "@/lib/utils";
+import { mockMarketData } from "@/lib/mock-data";
 import type { MATarget, KpiData } from "@/types/nexus";
 import { AlertTriangle, ArrowRight, Clock, FileText, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";

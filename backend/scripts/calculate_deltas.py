@@ -140,6 +140,19 @@ def compare_categorical_field(field: str, val_a: Any, val_b: Any) -> dict:
     }
 
 
+def _safe_int(val: Any, default: int) -> int:
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        import re
+        match = re.search(r"\b(19|20)\d{2}\b", str(val))
+        if match:
+            return int(match.group(0))
+        return default
+
+
 def calculate_deltas(contract_a: dict, contract_b: dict) -> dict:
     """
     Main delta function.
@@ -152,8 +165,8 @@ def calculate_deltas(contract_a: dict, contract_b: dict) -> dict:
     Returns:
         dict: Full delta report matching DeltaReport TypeScript interface
     """
-    year_a = int(contract_a.get("policy_year", 2018))
-    year_b = int(contract_b.get("policy_year", 2024))
+    year_a = _safe_int(contract_a.get("policy_year"), 2018)
+    year_b = _safe_int(contract_b.get("policy_year"), 2024)
 
     cumulative_inflation = compute_cumulative_inflation(year_a, year_b)
 

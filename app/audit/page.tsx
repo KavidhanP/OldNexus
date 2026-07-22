@@ -28,7 +28,13 @@ function RiskBadge({ level }: { level: RiskLevel }) {
 
 function ScanPanel({ scan }: { scan: AuditScan }) {
   const [expanded, setExpanded] = useState(true);
-  const sorted = [...scan.results].sort(
+  const [selectedFilter, setSelectedFilter] = useState<RiskLevel | "ALL">("ALL");
+
+  const filtered = selectedFilter === "ALL"
+    ? scan.results
+    : scan.results.filter((r) => r.risk_level === selectedFilter);
+
+  const sorted = [...filtered].sort(
     (a, b) => RISK_ORDER[a.risk_level] - RISK_ORDER[b.risk_level]
   );
   const critical = scan.results.filter((r) => r.risk_level === "CRITICAL").length;
@@ -99,12 +105,40 @@ function ScanPanel({ scan }: { scan: AuditScan }) {
             {/* Risk summary sidebar */}
             <div className="space-y-4">
               <div className="card p-4">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">Risk Summary</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-800">Risk Summary</h3>
+                  {selectedFilter !== "ALL" && (
+                    <button
+                      onClick={() => setSelectedFilter("ALL")}
+                      className="text-[10px] text-burgundy-900 hover:underline font-medium"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
+                </div>
+                
+                <button
+                  onClick={() => setSelectedFilter("ALL")}
+                  className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-medium mb-2 transition-colors ${
+                    selectedFilter === "ALL" ? "bg-burgundy-900/10 text-burgundy-900 border border-burgundy-900/20" : "hover:bg-frost-50 text-slate-700"
+                  }`}
+                >
+                  <span>All Findings</span>
+                  <span className="font-bold">{scan.results.length}</span>
+                </button>
+
                 {(["CRITICAL", "HIGH", "MEDIUM", "LOW"] as RiskLevel[]).map((level) => {
                   const count = scan.results.filter((r) => r.risk_level === level).length;
                   const total = scan.results.length || 1;
+                  const isSelected = selectedFilter === level;
                   return (
-                    <div key={level} className="flex items-center gap-3 mb-3">
+                    <button
+                      key={level}
+                      onClick={() => setSelectedFilter(isSelected ? "ALL" : level)}
+                      className={`w-full flex items-center gap-3 p-1.5 rounded-lg text-left transition-colors ${
+                        isSelected ? "bg-frost-100 ring-1 ring-burgundy-900/30" : "hover:bg-frost-50"
+                      }`}
+                    >
                       <RiskBadge level={level} />
                       <div className="flex-1 h-1.5 bg-frost-100 rounded-full overflow-hidden">
                         <div
@@ -119,7 +153,7 @@ function ScanPanel({ scan }: { scan: AuditScan }) {
                         />
                       </div>
                       <span className="text-xs font-bold text-slate-700 tabular-nums w-4">{count}</span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -135,39 +169,45 @@ function ScanPanel({ scan }: { scan: AuditScan }) {
 
             {/* Red flag results */}
             <div className="xl:col-span-2 space-y-3">
-              {sorted.map((result, i) => (
-                <div
-                  key={result.id}
-                  className={`card p-4 animate-slide-up border-l-4 ${
-                    result.risk_level === "CRITICAL"
-                      ? "border-l-red-600"
-                      : result.risk_level === "HIGH"
-                      ? "border-l-orange-500"
-                      : result.risk_level === "MEDIUM"
-                      ? "border-l-amber-500"
-                      : "border-l-emerald-500"
-                  }`}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <RiskBadge level={result.risk_level} />
-                      <span className="text-sm font-semibold text-slate-800">{result.clause_type}</span>
-                    </div>
-                    <span className="text-xs text-frost-600 flex-shrink-0">Page {result.page_number}</span>
-                  </div>
-                  <blockquote className="text-xs text-slate-600 italic border-l-2 border-frost-200 pl-3 mb-3 leading-relaxed">
-                    &ldquo;{result.excerpt}&rdquo;
-                  </blockquote>
-                  <div
-                    className="rounded-lg p-3 text-xs"
-                    style={{ background: "rgba(242,247,249,0.8)" }}
-                  >
-                    <p className="font-semibold text-slate-700 mb-0.5">Recommendation</p>
-                    <p className="text-slate-600 leading-relaxed">{result.recommendation}</p>
-                  </div>
+              {sorted.length === 0 ? (
+                <div className="p-8 text-center border border-dashed border-frost-200 rounded-xl">
+                  <p className="text-xs text-frost-500">No findings matched severity filter: {selectedFilter}</p>
                 </div>
-              ))}
+              ) : (
+                sorted.map((result, i) => (
+                  <div
+                    key={result.id}
+                    className={`card p-4 animate-slide-up border-l-4 ${
+                      result.risk_level === "CRITICAL"
+                        ? "border-l-red-600"
+                        : result.risk_level === "HIGH"
+                        ? "border-l-orange-500"
+                        : result.risk_level === "MEDIUM"
+                        ? "border-l-amber-500"
+                        : "border-l-emerald-500"
+                    }`}
+                    style={{ animationDelay: `${i * 60}ms` }}
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <RiskBadge level={result.risk_level} />
+                        <span className="text-sm font-semibold text-slate-800">{result.clause_type}</span>
+                      </div>
+                      <span className="text-xs text-frost-600 flex-shrink-0">Page {result.page_number}</span>
+                    </div>
+                    <blockquote className="text-xs text-slate-600 italic border-l-2 border-frost-200 pl-3 mb-3 leading-relaxed">
+                      &ldquo;{result.excerpt}&rdquo;
+                    </blockquote>
+                    <div
+                      className="rounded-lg p-3 text-xs"
+                      style={{ background: "rgba(242,247,249,0.8)" }}
+                    >
+                      <p className="font-semibold text-slate-700 mb-0.5">Recommendation</p>
+                      <p className="text-slate-600 leading-relaxed">{result.recommendation}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
