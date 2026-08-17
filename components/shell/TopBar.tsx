@@ -35,9 +35,9 @@ function LiveClock() {
   }, []);
 
   return (
-    <div className="text-right">
-      <p className="text-sm font-semibold text-slate-700 tabular-nums">{time}</p>
-      <p className="text-[10px] text-frost-600">{date}</p>
+    <div className="text-right" suppressHydrationWarning>
+      <p className="text-sm font-semibold text-slate-700 tabular-nums" suppressHydrationWarning>{time}</p>
+      <p className="text-[10px] text-frost-600" suppressHydrationWarning>{date}</p>
     </div>
   );
 }

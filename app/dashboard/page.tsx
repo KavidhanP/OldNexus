@@ -90,7 +90,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2 text-xs text-frost-600">
           <Clock className="w-3.5 h-3.5" />
-          <span>Live session · {new Date().toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+          <span suppressHydrationWarning>Live session · {new Date().toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
         </div>
       </div>
 
