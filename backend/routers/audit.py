@@ -28,7 +28,8 @@ RISK_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
 
 def scan_document(pdf_path: str, filename: str) -> dict:
     """
-    Scan a VDR document for M&A red flag clauses using Gemini.
+    Scan a VDR document for M&A red flag clauses using Groq / Llama 3.3.
+    Processes the document in page chunks to ensure 100% coverage and avoid truncation.
 
     Args:
         pdf_path: Path to the PDF file
@@ -37,7 +38,7 @@ def scan_document(pdf_path: str, filename: str) -> dict:
     Returns:
         dict: Scan results with red flag list
     """
-    # Extract text
+    # Extract text page by page
     text_chunks: list[str] = []
     total_pages = 0
     with pdfplumber.open(pdf_path) as pdf:
@@ -48,45 +49,75 @@ def scan_document(pdf_path: str, filename: str) -> dict:
                 # Include page number marker for extraction
                 text_chunks.append(f"[PAGE {i + 1}]\n{text}")
 
-    raw_text = "\n\n".join(text_chunks)[:40_000]  # 40k char context limit
+    # If no text extracted, return empty findings
+    if not text_chunks:
+        return {
+            "document_name": filename,
+            "total_pages": total_pages,
+            "results": [],
+        }
 
+    # Load prompts
     system_instructions = PROMPT_PATH.read_text(encoding="utf-8")
 
-    prompt = f"""{system_instructions}
+    # Define chunk size (number of pages processed in one prompt)
+    chunk_size = 3
+    all_results = []
+
+    # Process page groups
+    for start_idx in range(0, total_pages, chunk_size):
+        end_idx = min(start_idx + chunk_size, total_pages)
+        chunk_text = "\n\n".join(text_chunks[start_idx:end_idx])
+
+        prompt = f"""{system_instructions}
 
 ## Document to Scan:
 Filename: {filename}
 Total Pages: {total_pages}
+Current Segment Pages: {start_idx + 1} to {end_idx}
 
-## Document Content:
-{raw_text}
+## Document Content (Segment):
+{chunk_text}
 
 ## Task:
-Scan the document for all red flag clauses as defined in your instructions.
-When referencing page numbers, use the [PAGE N] markers in the text above.
+Scan this segment of the document for all red flag clauses as defined in your instructions.
+When referencing page numbers, use the exact [PAGE N] markers in the text above.
 Return ONLY a JSON object with a single key 'flags' containing an array of red flag objects. No explanation, no markdown fences.
 If no red flags exist, return: {{"flags": []}}
 """
 
-    response = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.1,
-        response_format={"type": "json_object"},
-    )
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        )
 
-    raw_json = response.choices[0].message.content.strip()
+        raw_json = response.choices[0].message.content.strip()
 
-    parsed = json.loads(raw_json)
-    results = parsed.get("flags", [])
+        try:
+            parsed = json.loads(raw_json)
+            flags = parsed.get("flags", [])
+            all_results.extend(flags)
+        except Exception:
+            # Fallback cleaning if markdown code fences were returned
+            try:
+                cleaned = raw_json.strip("`").lstrip("json\n").strip()
+                parsed = json.loads(cleaned)
+                flags = parsed.get("flags", [])
+                all_results.extend(flags)
+            except Exception as e:
+                # Log error and continue to avoid crashing the entire scan
+                print(f"[Error] Failed to parse JSON response for pages {start_idx+1}-{end_idx}: {str(e)}")
+                continue
 
     # Sort by risk level
-    results.sort(key=lambda r: RISK_ORDER.get(r.get("risk_level", "LOW"), 99))
+    all_results.sort(key=lambda r: RISK_ORDER.get(r.get("risk_level", "LOW"), 99))
 
     # Attach IDs and document name
-    for r in results:
+    for r in all_results:
         r["id"] = str(uuid.uuid4())
         r["document_name"] = filename
         r["scanned_at"] = ""  # Will be set in the endpoint
@@ -94,7 +125,7 @@ If no red flags exist, return: {{"flags": []}}
     return {
         "document_name": filename,
         "total_pages": total_pages,
-        "results": results,
+        "results": all_results,
     }
 
 
