@@ -26,19 +26,79 @@ router = APIRouter()
 RISK_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
 
 
+def fallback_scan_document(text_chunks: list[str], filename: str, total_pages: int) -> dict:
+    """Rule-based VDR red flag scanner when LLM/Groq API is unavailable."""
+    results = []
+    rules = [
+        ("Change of Control / Assignment", ["change of control", "assignment", "consent required", "transfer of rights"], "CRITICAL",
+         "Clause requires counterparty consent upon ownership change, posing transaction deal-block risk.",
+         "Obtain written waiver from counterparty prior to closing transaction."),
+        ("Indemnification & Cap", ["indemnity", "indemnify", "unlimited liability", "hold harmless"], "HIGH",
+         "Contains uncapped indemnity obligations or broad hold-harmless provisions.",
+         "Negotiate liability caps equal to total contract value or tail insurance coverage."),
+        ("Exclusivity & Non-Compete", ["exclusivity", "non-compete", "restrictive covenant", "solicit"], "HIGH",
+         "Restricts market operation post-acquisition or imposes non-solicitation liabilities.",
+         "Carve out target portfolio companies from restrictive operational covenants."),
+        ("Termination & Penalty", ["termination for convenience", "break fee", "liquidated damages", "cancellation"], "MEDIUM",
+         "Subject to unilateral termination or penalty fees upon structural changes.",
+         "Secure transition agreements and verify fee schedules prior to closing."),
+        ("Governing Law & Venue", ["jurisdiction", "governing law", "arbitration", "forum"], "LOW",
+         "Specifies foreign governing law or non-standard dispute resolution venue.",
+         "Review legal costs and align dispute resolution with primary operating jurisdiction.")
+    ]
+
+    for title, keywords, risk, explanation, recommendation in rules:
+        matched_pages = []
+        clause_snippet = ""
+        for i, chunk in enumerate(text_chunks):
+            chunk_lower = chunk.lower()
+            for kw in keywords:
+                if kw in chunk_lower:
+                    matched_pages.append(i + 1)
+                    if not clause_snippet:
+                        idx = chunk_lower.find(kw)
+                        start = max(0, idx - 80)
+                        end = min(len(chunk), idx + 120)
+                        clause_snippet = "..." + chunk[start:end].replace("\n", " ").strip() + "..."
+                    break
+
+        if matched_pages:
+            results.append({
+                "clause_type": title,
+                "title": title,
+                "risk_level": risk,
+                "page_number": f"Page {matched_pages[0]}" if len(matched_pages) == 1 else f"Pages {', '.join(map(str, matched_pages))}",
+                "page": matched_pages[0],
+                "clause_text": clause_snippet or f"Reference clause matching {title.lower()} terms.",
+                "explanation": explanation,
+                "recommendation": recommendation,
+            })
+
+    if not results:
+        results.append({
+            "clause_type": "Standard Operational Terms",
+            "title": "Standard Commercial Agreement",
+            "risk_level": "LOW",
+            "page_number": "Page 1",
+            "page": 1,
+            "clause_text": "Standard commercial terms reviewed. No high-risk change of control or uncapped indemnity clauses detected.",
+            "explanation": "Document conforms to baseline commercial standards with standard risk exposure.",
+            "recommendation": "Proceed with standard integration due diligence checklist.",
+        })
+
+    return {
+        "document_name": filename,
+        "total_pages": total_pages,
+        "results": results,
+    }
+
+
 def scan_document(pdf_path: str, filename: str) -> dict:
     """
     Scan a VDR document for M&A red flag clauses using Groq / Llama 3.3.
     Processes the document in page chunks to ensure 100% coverage and avoid truncation.
-
-    Args:
-        pdf_path: Path to the PDF file
-        filename: Original filename for the report
-
-    Returns:
-        dict: Scan results with red flag list
+    Falls back gracefully to rule-based analysis if Groq API is unavailable.
     """
-    # Extract text page by page
     text_chunks: list[str] = []
     total_pages = 0
     with pdfplumber.open(pdf_path) as pdf:
@@ -46,10 +106,8 @@ def scan_document(pdf_path: str, filename: str) -> dict:
         for i, page in enumerate(pdf.pages):
             text = page.extract_text()
             if text:
-                # Include page number marker for extraction
                 text_chunks.append(f"[PAGE {i + 1}]\n{text}")
 
-    # If no text extracted, return empty findings
     if not text_chunks:
         return {
             "document_name": filename,
@@ -57,19 +115,26 @@ def scan_document(pdf_path: str, filename: str) -> dict:
             "results": [],
         }
 
-    # Load prompts
-    system_instructions = PROMPT_PATH.read_text(encoding="utf-8")
+    # If Groq API key is missing or empty, use fallback scanner directly
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        print("[Warning] GROQ_API_KEY is not set. Using rule-based fallback scanner.")
+        res = fallback_scan_document(text_chunks, filename, total_pages)
+        for r in res["results"]:
+            r["id"] = str(uuid.uuid4())
+            r["document_name"] = filename
+        return res
 
-    # Define chunk size (number of pages processed in one prompt)
+    system_instructions = PROMPT_PATH.read_text(encoding="utf-8")
     chunk_size = 3
     all_results = []
 
-    # Process page groups
-    for start_idx in range(0, total_pages, chunk_size):
-        end_idx = min(start_idx + chunk_size, total_pages)
-        chunk_text = "\n\n".join(text_chunks[start_idx:end_idx])
+    try:
+        for start_idx in range(0, total_pages, chunk_size):
+            end_idx = min(start_idx + chunk_size, total_pages)
+            chunk_text = "\n\n".join(text_chunks[start_idx:end_idx])
 
-        prompt = f"""{system_instructions}
+            prompt = f"""{system_instructions}
 
 ## Document to Scan:
 Filename: {filename}
@@ -86,47 +151,46 @@ Return ONLY a JSON object with a single key 'flags' containing an array of red f
 If no red flags exist, return: {{"flags": []}}
 """
 
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,
-            response_format={"type": "json_object"},
-        )
+            response = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                response_format={"type": "json_object"},
+            )
 
-        raw_json = response.choices[0].message.content.strip()
+            raw_json = response.choices[0].message.content.strip()
 
-        try:
-            parsed = json.loads(raw_json)
-            flags = parsed.get("flags", [])
-            all_results.extend(flags)
-        except Exception:
-            # Fallback cleaning if markdown code fences were returned
             try:
-                cleaned = raw_json.strip("`").lstrip("json\n").strip()
-                parsed = json.loads(cleaned)
+                parsed = json.loads(raw_json)
                 flags = parsed.get("flags", [])
                 all_results.extend(flags)
-            except Exception as e:
-                # Log error and continue to avoid crashing the entire scan
-                print(f"[Error] Failed to parse JSON response for pages {start_idx+1}-{end_idx}: {str(e)}")
-                continue
+            except Exception:
+                try:
+                    cleaned = raw_json.strip("`").lstrip("json\n").strip()
+                    parsed = json.loads(cleaned)
+                    flags = parsed.get("flags", [])
+                    all_results.extend(flags)
+                except Exception as e:
+                    print(f"[Error] Failed to parse JSON response for pages {start_idx+1}-{end_idx}: {str(e)}")
+                    continue
 
-    # Sort by risk level
-    all_results.sort(key=lambda r: RISK_ORDER.get(r.get("risk_level", "LOW"), 99))
+        all_results.sort(key=lambda r: RISK_ORDER.get(r.get("risk_level", "LOW"), 99))
+        for r in all_results:
+            r["id"] = str(uuid.uuid4())
+            r["document_name"] = filename
 
-    # Attach IDs and document name
-    for r in all_results:
-        r["id"] = str(uuid.uuid4())
-        r["document_name"] = filename
-        r["scanned_at"] = ""  # Will be set in the endpoint
-
-    return {
-        "document_name": filename,
-        "total_pages": total_pages,
-        "results": all_results,
-    }
+        return {
+            "document_name": filename,
+            "total_pages": total_pages,
+            "results": all_results,
+        }
+    except Exception as err:
+        print(f"[Warning] Groq API call failed ({str(err)}). Falling back to rule-based scanner.")
+        res = fallback_scan_document(text_chunks, filename, total_pages)
+        for r in res["results"]:
+            r["id"] = str(uuid.uuid4())
+            r["document_name"] = filename
+        return res
 
 
 @router.post("/scan")
