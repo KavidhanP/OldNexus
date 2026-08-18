@@ -3,6 +3,17 @@
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 
+/* ─────────────────────────────────────────────────────────────
+   Cap3DCanvas
+   ─────────────────────────────────────────────────────────────
+   The graduation cap is NOT rendered as solid geometry.
+   Instead, hundreds of tiny triangle outlines are scattered
+   across every surface of the cap shape, coloured from a
+   palette (white, gold, crimson, violet, teal).  Thin lines
+   connect nearby triangles.  The overall cap form emerges
+   from this particle cloud — matching the Dala-style reference.
+   ──────────────────────────────────────────────────────────── */
+
 export default function Cap3DCanvas() {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -10,301 +21,329 @@ export default function Cap3DCanvas() {
     const container = mountRef.current;
     if (!container) return;
 
-    const W = container.clientWidth  || 640;
-    const H = container.clientHeight || 640;
+    const W = container.clientWidth  || 700;
+    const H = container.clientHeight || 700;
 
-    /* ─── RENDERER / CAMERA ─────────────────────────────────
-       Camera pulled far back + wide FOV so the full cap +
-       tassel is NEVER clipped at any rotation angle.
-    ──────────────────────────────────────────────────────── */
-    const scene    = new THREE.Scene();
-    const camera   = new THREE.PerspectiveCamera(38, W / H, 0.1, 500);
-    camera.position.set(0, 1.0, 18);   // z=18 gives generous room
-    camera.lookAt(0, -0.5, 0);
+    /* ── Scene ─────────────────────────────────────────────── */
+    const scene  = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 600);
+    // Camera far back — guarantees zero clipping at any rotation
+    camera.position.set(0, 0.8, 22);
+    camera.lookAt(0, -0.3, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping  = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
     container.appendChild(renderer.domElement);
 
-    /* ─── LIGHTING ─────────────────────────────────────────── */
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const key = new THREE.DirectionalLight(0xffffff, 1.6);
-    key.position.set(8, 14, 10); scene.add(key);
-    const rim = new THREE.DirectionalLight(0xe11d48, 1.0);
-    rim.position.set(0, 8, -12); scene.add(rim);
-    const under = new THREE.DirectionalLight(0xffd070, 0.35);
-    under.position.set(0, -8, 4); scene.add(under);
+    /* ── Minimal lighting — we mostly use vertex colours ──── */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
-    /* ─── COLOUR HELPERS ───────────────────────────────────── */
-    const edgeMat  = (hex: number, opacity = 1.0) =>
-      new THREE.LineBasicMaterial({ color: hex, transparent: opacity < 1, opacity, depthWrite: false });
+    /* ── Colour palette (matching reference) ─────────────── */
+    const PALETTE = [
+      new THREE.Color(0xffffff),  // white
+      new THREE.Color(0xffffff),  // white (2× frequency)
+      new THREE.Color(0xf0d060),  // gold / yellow
+      new THREE.Color(0xf0d060),  // gold (2× frequency)
+      new THREE.Color(0xe11d48),  // crimson red
+      new THREE.Color(0xc084fc),  // violet / purple
+      new THREE.Color(0x34d399),  // teal / mint green
+    ];
+    const rndCol = () => PALETTE[Math.floor(Math.random() * PALETTE.length)];
 
-    const faceMat  = (hex: number, opacity = 0.08) =>
-      new THREE.MeshStandardMaterial({
-        color: hex, roughness: 0.4, metalness: 0.2,
-        transparent: true, opacity, side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-
-    const solidMat = (hex: number) =>
-      new THREE.MeshStandardMaterial({ color: hex, roughness: 0.25, metalness: 0.55 });
-
-    /* Helper — add a geometry as ghost faces + visible edges */
-    const addWireObj = (
-      geo: THREE.BufferGeometry,
-      faceColor: number,
-      lineColor: number,
-      faceOpacity = 0.07,
-      lineOpacity = 1.0,
-      parent: THREE.Object3D = capGroup,
-    ) => {
-      parent.add(new THREE.Mesh(geo, faceMat(faceColor, faceOpacity)));
-      parent.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 12), edgeMat(lineColor, lineOpacity)));
-    };
-
-    /* ─── CAP GROUP ────────────────────────────────────────── */
+    /* ── Master group ────────────────────────────────────── */
     const capGroup = new THREE.Group();
-    // Scaled DOWN from earlier version so nothing clips
-    capGroup.scale.set(0.82, 0.82, 0.82);
-    capGroup.rotation.x = 0.36;
-    capGroup.rotation.y = -0.40;
+    capGroup.rotation.x = 0.35;
+    capGroup.rotation.y = -0.4;
     scene.add(capGroup);
 
     /* ═══════════════════════════════════════════════════════
-       1.  MORTARBOARD PLATE
-           Low-poly approach — edges define the form, ghost face fill.
+       STEP 1 — Sample surface points on the cap geometry
     ═══════════════════════════════════════════════════════ */
-    const PS  = 2.8;
-    const CR  = 0.30;
-    const plateShape = new THREE.Shape();
-    plateShape.moveTo(-PS + CR, -PS);
-    plateShape.lineTo( PS - CR, -PS);
-    plateShape.quadraticCurveTo( PS, -PS,  PS, -PS + CR);
-    plateShape.lineTo( PS,  PS - CR);
-    plateShape.quadraticCurveTo( PS,  PS,  PS - CR,  PS);
-    plateShape.lineTo(-PS + CR,  PS);
-    plateShape.quadraticCurveTo(-PS,  PS, -PS,  PS - CR);
-    plateShape.lineTo(-PS, -PS + CR);
-    plateShape.quadraticCurveTo(-PS, -PS, -PS + CR, -PS);
+    type SurfacePt = { x: number; y: number; z: number };
+    const surfacePts: SurfacePt[] = [];
 
-    const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
-      depth: 0.20, bevelEnabled: true,
-      bevelSegments: 3, steps: 1,
-      bevelSize: 0.06, bevelThickness: 0.06,
-    });
-    plateGeo.rotateX(Math.PI / 2);
-    addWireObj(plateGeo, 0x111114, 0xffffff, 0.06, 0.75);
+    const PS = 3.0;   // plate half-size
 
-    /* Red trim border ring on plate edge */
-    const rimPts = [
-      new THREE.Vector3(-PS + 0.07, 0.20, -PS + 0.07),
-      new THREE.Vector3( PS - 0.07, 0.20, -PS + 0.07),
-      new THREE.Vector3( PS - 0.07, 0.20,  PS - 0.07),
-      new THREE.Vector3(-PS + 0.07, 0.20,  PS - 0.07),
-      new THREE.Vector3(-PS + 0.07, 0.20, -PS + 0.07),
-    ];
-    capGroup.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(rimPts),
-      edgeMat(0xe11d48, 0.9)
-    ));
-
-    /* Gold inner accent ring */
-    const goldPts = rimPts.map(v => new THREE.Vector3(
-      v.x * 0.87, v.y, v.z * 0.87
-    ));
-    capGroup.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(goldPts),
-      edgeMat(0xd4a520, 0.7)
-    ));
-
-    /* Corner stud rivets — solid small cylinders */
-    [[-PS+0.28,-PS+0.28],[PS-0.28,-PS+0.28],[PS-0.28,PS-0.28],[-PS+0.28,PS-0.28]].forEach(([cx, cz]) => {
-      const g = new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8);
-      g.translate(cx as number, 0.21, cz as number);
-      capGroup.add(new THREE.Mesh(g, solidMat(0xd4a520)));
-      capGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat(0xffffff, 0.5)));
-    });
-
-    /* ═══════════════════════════════════════════════════════
-       2.  CROWN — cylindrical, low-poly edges + ghost fill
-    ═══════════════════════════════════════════════════════ */
-    const crownTopR = 1.80;
-    const crownBotR = 2.14;
-    const crownH    = 1.52;
-
-    // Use low segment count so edges are clearly visible (geometric look)
-    const crownGeo = new THREE.CylinderGeometry(crownTopR, crownBotR, crownH, 14, 4, false);
-    crownGeo.translate(0, -crownH / 2 - 0.08, 0);
-    addWireObj(crownGeo, 0x111114, 0xffffff, 0.06, 0.65);
-
-    /* Red seam lines down the crown */
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2;
-      const pts: THREE.Vector3[] = [];
-      for (let t = 0; t <= 1; t += 0.08) {
-        const r = THREE.MathUtils.lerp(crownTopR, crownBotR, t) + 0.014;
-        pts.push(new THREE.Vector3(Math.cos(a)*r, -crownH*t - 0.08, Math.sin(a)*r));
-      }
-      capGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), edgeMat(0xe11d48, 0.50)));
+    /* 1a — Plate top face */
+    for (let i = 0; i < 320; i++) {
+      const x = (Math.random() * 2 - 1) * PS;
+      const z = (Math.random() * 2 - 1) * PS;
+      surfacePts.push({ x, y: 0, z });
     }
 
-    /* Horizontal ring bands */
-    [0.33, 0.66].forEach(t => {
-      const y  = -crownH * t - 0.08;
-      const r  = THREE.MathUtils.lerp(crownTopR, crownBotR, t) + 0.016;
-      const rGeo = new THREE.TorusGeometry(r, 0.028, 6, 22);
-      rGeo.rotateX(Math.PI / 2); rGeo.translate(0, y, 0);
-      addWireObj(rGeo, 0x6b0a1f, 0xe11d48, 0.12, 0.8);
-    });
+    /* 1b — Plate edges (4 sides, top & bottom strip) */
+    for (let i = 0; i < 100; i++) {
+      const t  = Math.random();
+      const d  = -0.20 * Math.random();          // plate depth
+      const side = Math.floor(Math.random() * 4);
+      let x = 0, z = 0;
+      if (side === 0) { x = -PS + t * 2 * PS; z = -PS; }
+      if (side === 1) { x = -PS + t * 2 * PS; z =  PS; }
+      if (side === 2) { x = -PS;              z = -PS + t * 2 * PS; }
+      if (side === 3) { x =  PS;              z = -PS + t * 2 * PS; }
+      surfacePts.push({ x, y: d, z });
+    }
 
-    /* Base collar bands */
-    const bBase = -crownH - 0.08;
-    const b1Geo = new THREE.TorusGeometry(crownBotR + 0.04, 0.10, 6, 22);
-    b1Geo.rotateX(Math.PI / 2); b1Geo.translate(0, bBase, 0);
-    addWireObj(b1Geo, 0xcc1133, 0xe11d48, 0.15, 0.9);
+    /* 1c — Plate bottom face (sparse) */
+    for (let i = 0; i < 80; i++) {
+      const x = (Math.random() * 2 - 1) * PS;
+      const z = (Math.random() * 2 - 1) * PS;
+      surfacePts.push({ x, y: -0.20, z });
+    }
 
-    const b2Geo = new THREE.TorusGeometry(crownBotR + 0.06, 0.055, 6, 22);
-    b2Geo.rotateX(Math.PI / 2); b2Geo.translate(0, bBase - 0.17, 0);
-    addWireObj(b2Geo, 0xd4a520, 0xffd070, 0.15, 0.9);
+    /* 1d — Crown (truncated cone) */
+    const crownTopR = 1.85;
+    const crownBotR = 2.18;
+    const crownH    = 1.55;
+    for (let i = 0; i < 280; i++) {
+      const t  = Math.random();                  // 0 = top, 1 = bottom
+      const a  = Math.random() * Math.PI * 2;
+      const r  = THREE.MathUtils.lerp(crownTopR, crownBotR, t);
+      const x  = Math.cos(a) * r;
+      const z  = Math.sin(a) * r;
+      const y  = -t * crownH - 0.10;
+      surfacePts.push({ x, y, z });
+    }
 
-    /* ═══════════════════════════════════════════════════════
-       3.  CENTRE FERRULE + BUTTON
-    ═══════════════════════════════════════════════════════ */
-    const ferGeo = new THREE.CylinderGeometry(0.36, 0.41, 0.10, 14);
-    ferGeo.translate(0, 0.18, 0);
-    addWireObj(ferGeo, 0xd4a520, 0xffd070, 0.25, 0.9);
+    /* 1e — Crown base collar ring */
+    for (let i = 0; i < 60; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = crownBotR + 0.06;
+      surfacePts.push({ x: Math.cos(a) * r, y: -crownH - 0.10, z: Math.sin(a) * r });
+    }
 
-    const btnGeo = new THREE.SphereGeometry(0.28, 10, 8);
-    btnGeo.translate(0, 0.30, 0);
-    addWireObj(btnGeo, 0xcc1133, 0xe11d48, 0.25, 0.9);
+    /* 1f — Centre button (hemisphere) */
+    for (let i = 0; i < 40; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.random() * Math.PI * 0.5;  // upper hemisphere
+      const r     = 0.35;
+      surfacePts.push({
+        x: r * Math.sin(phi) * Math.cos(theta),
+        y: r * Math.cos(phi) + 0.12,
+        z: r * Math.sin(phi) * Math.sin(theta),
+      });
+    }
 
-    /* ═══════════════════════════════════════════════════════
-       4.  TASSEL CORD + COLLAR + BRUSH
-    ═══════════════════════════════════════════════════════ */
-    const cordCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0,      0.30, 0),
-      new THREE.Vector3(0.62,   0.26, 0.60),
-      new THREE.Vector3(1.80,   0.21, 1.78),
-      new THREE.Vector3(2.55,   0.08, 2.24),
-      new THREE.Vector3(2.72,  -0.32, 2.20),
-      new THREE.Vector3(2.72,  -1.18, 2.14),
-      new THREE.Vector3(2.72,  -1.50, 2.14),
+    /* 1g — Tassel cord curve */
+    const cordPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0,      0.28, 0),
+      new THREE.Vector3(0.6,    0.24, 0.58),
+      new THREE.Vector3(1.75,   0.20, 1.72),
+      new THREE.Vector3(2.50,   0.06, 2.18),
+      new THREE.Vector3(2.68,  -0.34, 2.14),
+      new THREE.Vector3(2.68,  -1.15, 2.08),
+      new THREE.Vector3(2.68,  -1.48, 2.08),
     ]);
-
-    // Tube with low radial segments — visible geometric edges
-    const cordGeo = new THREE.TubeGeometry(cordCurve, 28, 0.085, 7, false);
-    addWireObj(cordGeo, 0xf0e8d0, 0xffffff, 0.18, 0.7);
-
-    /* Collar beads */
-    const collarEnd = cordCurve.getPoint(1);
-    for (let b = 0; b < 4; b++) {
-      const beadGeo = new THREE.TorusGeometry(0.16, 0.055, 5, 14);
-      beadGeo.rotateX(Math.PI / 2);
-      beadGeo.translate(collarEnd.x, collarEnd.y - b * 0.13, collarEnd.z);
-      addWireObj(beadGeo, b % 2 === 0 ? 0xcc1133 : 0xd4a520, b % 2 === 0 ? 0xe11d48 : 0xffd070, 0.20, 0.9);
+    for (let i = 0; i < 60; i++) {
+      const pt = cordPath.getPoint(i / 60);
+      // scatter slightly around the curve
+      surfacePts.push({
+        x: pt.x + (Math.random() - 0.5) * 0.16,
+        y: pt.y + (Math.random() - 0.5) * 0.16,
+        z: pt.z + (Math.random() - 0.5) * 0.16,
+      });
     }
 
-    /* Tassel brush */
-    const brushPts: THREE.Vector2[] = [
-      new THREE.Vector2(0.04,  0.00),
-      new THREE.Vector2(0.22, -0.14),
-      new THREE.Vector2(0.33, -0.42),
-      new THREE.Vector2(0.36, -0.68),
-      new THREE.Vector2(0.28, -0.92),
-      new THREE.Vector2(0.14, -1.06),
-      new THREE.Vector2(0.00, -1.12),
-    ];
-    const brushGeo = new THREE.LatheGeometry(brushPts, 10);
-    brushGeo.translate(collarEnd.x, collarEnd.y - 0.55, collarEnd.z);
-    addWireObj(brushGeo, 0xcc1133, 0xe11d48, 0.20, 0.80);
-
-    /* Thread lines */
-    const threadPos: number[] = [];
-    for (let i = 0; i < 20; i++) {
-      const a = (i / 20) * Math.PI * 2;
-      const rx = Math.cos(a) * 0.13; const rz = Math.sin(a) * 0.13;
-      threadPos.push(collarEnd.x + rx, collarEnd.y - 1.68, collarEnd.z + rz);
-      threadPos.push(collarEnd.x + rx * 1.55, collarEnd.y - 2.08 - Math.random() * 0.30, collarEnd.z + rz * 1.55);
+    /* 1h — Tassel brush (cone / teardrop) */
+    const brushCx = 2.68, brushCz = 2.08;
+    for (let i = 0; i < 60; i++) {
+      const t  = Math.random();                   // 0 = top, 1 = tip
+      const a  = Math.random() * Math.PI * 2;
+      const r  = (0.35 * Math.sin(t * Math.PI)) * (1 - t * 0.4);
+      const y  = -1.55 - t * 1.15;
+      surfacePts.push({ x: brushCx + Math.cos(a) * r, y, z: brushCz + Math.sin(a) * r });
     }
-    const threadGeo = new THREE.BufferGeometry();
-    threadGeo.setAttribute("position", new THREE.Float32BufferAttribute(threadPos, 3));
-    capGroup.add(new THREE.LineSegments(threadGeo, edgeMat(0xf0e8d0, 0.8)));
+
+    const NUM_PTS = surfacePts.length; // ~1000 pts
 
     /* ═══════════════════════════════════════════════════════
-       5.  PARTICLES — max 3, very slow, orbiting shooting stars
+       STEP 2 — At each point, create a tiny triangle outline
+       Random size (0.06–0.18), random rotation
     ═══════════════════════════════════════════════════════ */
-    type StarData = {
-      /** world position */ pos: THREE.Vector3;
-      /** direction unit vector */ dir: THREE.Vector3;
-      /** current speed (very slow) */ speed: number;
-      /** trail length */ trailLen: number;
-      /** how long it has lived */ life: number;
-      /** max life before respawn */ maxLife: number;
+    // We'll batch everything into one big LineSegments buffer
+    // Each triangle = 3 edges = 6 line-segment endpoints
+
+    const triVerts: number[] = [];
+    const triColors: number[] = [];
+
+    const _v0 = new THREE.Vector3();
+    const _v1 = new THREE.Vector3();
+    const _v2 = new THREE.Vector3();
+    const _axis = new THREE.Vector3();
+    const _q   = new THREE.Quaternion();
+
+    for (let i = 0; i < NUM_PTS; i++) {
+      const p = surfacePts[i];
+      const size = 0.06 + Math.random() * 0.14;
+      const col  = rndCol();
+
+      // Equilateral triangle vertices in local XZ plane
+      _v0.set(0,            0,  size);
+      _v1.set( size * 0.866, 0, -size * 0.5);
+      _v2.set(-size * 0.866, 0, -size * 0.5);
+
+      // Random rotation
+      _axis.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      _q.setFromAxisAngle(_axis, Math.random() * Math.PI * 2);
+      _v0.applyQuaternion(_q);
+      _v1.applyQuaternion(_q);
+      _v2.applyQuaternion(_q);
+
+      // Translate to surface point
+      _v0.x += p.x; _v0.y += p.y; _v0.z += p.z;
+      _v1.x += p.x; _v1.y += p.y; _v1.z += p.z;
+      _v2.x += p.x; _v2.y += p.y; _v2.z += p.z;
+
+      // Edge 0→1
+      triVerts.push(_v0.x, _v0.y, _v0.z, _v1.x, _v1.y, _v1.z);
+      triColors.push(col.r, col.g, col.b, col.r, col.g, col.b);
+      // Edge 1→2
+      triVerts.push(_v1.x, _v1.y, _v1.z, _v2.x, _v2.y, _v2.z);
+      triColors.push(col.r, col.g, col.b, col.r, col.g, col.b);
+      // Edge 2→0
+      triVerts.push(_v2.x, _v2.y, _v2.z, _v0.x, _v0.y, _v0.z);
+      triColors.push(col.r, col.g, col.b, col.r, col.g, col.b);
+    }
+
+    const triGeo = new THREE.BufferGeometry();
+    triGeo.setAttribute("position", new THREE.Float32BufferAttribute(triVerts, 3));
+    triGeo.setAttribute("color",    new THREE.Float32BufferAttribute(triColors, 3));
+    const triMat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+    });
+    capGroup.add(new THREE.LineSegments(triGeo, triMat));
+
+    /* ═══════════════════════════════════════════════════════
+       STEP 3 — Connecting lines between nearby triangles
+       For each point, draw a thin line to its 1-2 nearest
+       neighbours within a threshold distance.
+    ═══════════════════════════════════════════════════════ */
+    const connVerts: number[] = [];
+    const connColors: number[] = [];
+    const CONNECT_DIST = 0.65;
+
+    // For performance, only check a random subset of pairs
+    for (let i = 0; i < NUM_PTS; i++) {
+      const pi = surfacePts[i];
+      let connected = 0;
+      // Check ~15 random neighbours
+      for (let attempt = 0; attempt < 15 && connected < 2; attempt++) {
+        const j = Math.floor(Math.random() * NUM_PTS);
+        if (j === i) continue;
+        const pj = surfacePts[j];
+        const dx = pi.x - pj.x, dy = pi.y - pj.y, dz = pi.z - pj.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < CONNECT_DIST) {
+          connVerts.push(pi.x, pi.y, pi.z, pj.x, pj.y, pj.z);
+          const c = rndCol();
+          connColors.push(c.r, c.g, c.b, c.r * 0.3, c.g * 0.3, c.b * 0.3);
+          connected++;
+        }
+      }
+    }
+
+    const connGeo = new THREE.BufferGeometry();
+    connGeo.setAttribute("position", new THREE.Float32BufferAttribute(connVerts, 3));
+    connGeo.setAttribute("color",    new THREE.Float32BufferAttribute(connColors, 3));
+    const connMat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+    });
+    capGroup.add(new THREE.LineSegments(connGeo, connMat));
+
+    /* ═══════════════════════════════════════════════════════
+       STEP 4 — Faint glow dots at each surface point
+       (small additive-blended sprites give the glow haze
+       visible in the reference image)
+    ═══════════════════════════════════════════════════════ */
+    const dotPositions = new Float32Array(NUM_PTS * 3);
+    const dotColors    = new Float32Array(NUM_PTS * 3);
+    for (let i = 0; i < NUM_PTS; i++) {
+      const p = surfacePts[i];
+      dotPositions[i * 3]     = p.x;
+      dotPositions[i * 3 + 1] = p.y;
+      dotPositions[i * 3 + 2] = p.z;
+      const c = rndCol();
+      dotColors[i * 3]     = c.r;
+      dotColors[i * 3 + 1] = c.g;
+      dotColors[i * 3 + 2] = c.b;
+    }
+    const dotGeo = new THREE.BufferGeometry();
+    dotGeo.setAttribute("position", new THREE.BufferAttribute(dotPositions, 3));
+    dotGeo.setAttribute("color",    new THREE.BufferAttribute(dotColors,    3));
+    const dotMat = new THREE.PointsMaterial({
+      size: 0.06,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.55,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    capGroup.add(new THREE.Points(dotGeo, dotMat));
+
+    /* ═══════════════════════════════════════════════════════
+       STEP 5 — 10 slow orbiting shooting-star particles
+    ═══════════════════════════════════════════════════════ */
+    const NUM_STARS = 10;
+    type Star = {
+      pos: THREE.Vector3; dir: THREE.Vector3;
+      speed: number; trailLen: number;
+      life: number; maxLife: number;
     };
 
-    const NUM_STARS = 3;
-
-    const spawnStar = (): StarData => {
-      // Spawn at a random point on a sphere around the cap
+    const spawnStar = (): Star => {
       const theta = Math.random() * Math.PI * 2;
       const phi   = Math.acos(2 * Math.random() - 1);
-      const r     = 5.5 + Math.random() * 3;
+      const r     = 5 + Math.random() * 3.5;
       const pos   = new THREE.Vector3(
         r * Math.sin(phi) * Math.cos(theta),
         r * Math.cos(phi),
         r * Math.sin(phi) * Math.sin(theta),
       );
-      // Direction: tangent to the sphere (orbit-like), slightly inward
-      const radial = pos.clone().normalize();
-      const tangent = new THREE.Vector3(
-        -(Math.sin(theta)),
-        0,
-        Math.cos(theta),
-      ).normalize();
-      const dir = tangent.add(radial.multiplyScalar(-0.12)).normalize();
-
+      const tangent = new THREE.Vector3(-Math.sin(theta), 0, Math.cos(theta)).normalize();
+      const radial  = pos.clone().normalize();
+      const dir     = tangent.add(radial.multiplyScalar(-0.08)).normalize();
       return {
-        pos,
-        dir,
-        speed:    0.018 + Math.random() * 0.012, // very slow
-        trailLen: 1.2  + Math.random() * 1.0,
-        life:     Math.floor(Math.random() * 300),
-        maxLife:  260  + Math.floor(Math.random() * 180),
+        pos, dir,
+        speed:    0.014 + Math.random() * 0.010,
+        trailLen: 0.9 + Math.random() * 0.8,
+        life:     Math.floor(Math.random() * 350),
+        maxLife:  300 + Math.floor(Math.random() * 200),
       };
     };
 
-    const stars: StarData[] = Array.from({ length: NUM_STARS }, spawnStar);
-
-    // Each star: 2 points (head + tail) = LineSegments
+    const stars: Star[] = Array.from({ length: NUM_STARS }, spawnStar);
     const starPositions = new Float32Array(NUM_STARS * 2 * 3);
     const starColors    = new Float32Array(NUM_STARS * 2 * 3);
-    const STAR_PALETTE  = [
-      new THREE.Color(0xffffff),
-      new THREE.Color(0xffd070),
-      new THREE.Color(0xe11d48),
-    ];
 
-    // Assign a fixed colour per star
-    const starCol = stars.map((_, i) => STAR_PALETTE[i % STAR_PALETTE.length]);
+    const STAR_COLS = [
+      new THREE.Color(0xffffff),
+      new THREE.Color(0xf0d060),
+      new THREE.Color(0xe11d48),
+      new THREE.Color(0xc084fc),
+      new THREE.Color(0x34d399),
+    ];
+    const starColArr = stars.map((_, i) => STAR_COLS[i % STAR_COLS.length]);
 
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
     starGeo.setAttribute("color",    new THREE.BufferAttribute(starColors,    3));
-
     const starMat = new THREE.LineBasicMaterial({
-      vertexColors: true,
-      transparent:  true,
-      opacity:      0.85,
-      blending:     THREE.AdditiveBlending,
-      depthWrite:   false,
-      linewidth:    1,
+      vertexColors: true, transparent: true, opacity: 0.80,
+      blending: THREE.AdditiveBlending, depthWrite: false,
     });
     scene.add(new THREE.LineSegments(starGeo, starMat));
 
-    /* ─── ANIMATION ────────────────────────────────────────── */
+    /* ═══════════════════════════════════════════════════════
+       ANIMATION
+    ═══════════════════════════════════════════════════════ */
     let raf: number;
     const clock = new THREE.Clock();
 
@@ -312,47 +351,44 @@ export default function Cap3DCanvas() {
       raf = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
 
-      /* Rotate cap — gentle, steady */
-      capGroup.rotation.y = -0.40 + t * 0.22;
-      capGroup.position.y = Math.sin(t * 0.8) * 0.14;
+      /* Rotate cap — slow and steady */
+      capGroup.rotation.y = -0.4 + t * 0.20;
+      capGroup.position.y = Math.sin(t * 0.7) * 0.12;
 
-      /* Update shooting stars */
-      const sPos = starGeo.attributes.position as THREE.BufferAttribute;
-      const sCol = starGeo.attributes.color    as THREE.BufferAttribute;
+      /* Update stars */
+      const sp = starGeo.attributes.position as THREE.BufferAttribute;
+      const sc = starGeo.attributes.color    as THREE.BufferAttribute;
 
       for (let i = 0; i < NUM_STARS; i++) {
         const s = stars[i];
         s.pos.addScaledVector(s.dir, s.speed);
         s.life++;
-
-        // Gently curve direction so it orbits
-        s.dir.applyAxisAngle(new THREE.Vector3(0.1, 1, 0.05).normalize(), 0.003);
+        // Gentle orbital curve
+        s.dir.applyAxisAngle(new THREE.Vector3(0.08, 1, 0.04).normalize(), 0.0025);
         s.dir.normalize();
-
         if (s.life > s.maxLife) Object.assign(s, spawnStar());
 
-        const fade = Math.min(1, Math.min(s.life / 40, (s.maxLife - s.life) / 40));
+        const fade = Math.min(1, Math.min(s.life / 50, (s.maxLife - s.life) / 50));
+        const col  = starColArr[i];
 
-        // Head
-        sPos.setXYZ(i * 2,     s.pos.x, s.pos.y, s.pos.z);
-        sCol.setXYZ(i * 2,     starCol[i].r * fade, starCol[i].g * fade, starCol[i].b * fade);
-        // Tail
+        sp.setXYZ(i * 2,     s.pos.x, s.pos.y, s.pos.z);
+        sc.setXYZ(i * 2,     col.r * fade, col.g * fade, col.b * fade);
+
         const tail = s.pos.clone().addScaledVector(s.dir, -s.trailLen);
-        sPos.setXYZ(i * 2 + 1, tail.x, tail.y, tail.z);
-        sCol.setXYZ(i * 2 + 1, 0, 0, 0); // tail fades to black
+        sp.setXYZ(i * 2 + 1, tail.x, tail.y, tail.z);
+        sc.setXYZ(i * 2 + 1, 0, 0, 0);
       }
-      sPos.needsUpdate = true;
-      sCol.needsUpdate = true;
+      sp.needsUpdate = true;
+      sc.needsUpdate = true;
 
       renderer.render(scene, camera);
     };
     animate();
 
-    /* ─── RESIZE ───────────────────────────────────────────── */
+    /* ── Resize ──────────────────────────────────────────── */
     const onResize = () => {
       if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
+      const w = container.clientWidth, h = container.clientHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -368,8 +404,9 @@ export default function Cap3DCanvas() {
   }, []);
 
   return (
-    <div className="relative w-full h-[520px] lg:h-[640px] flex items-center justify-center select-none overflow-visible pointer-events-none">
-      <div ref={mountRef} className="w-full h-full" />
+    <div className="relative w-full h-[540px] lg:h-[660px] flex items-center justify-center select-none pointer-events-none"
+         style={{ overflow: "visible" }}>
+      <div ref={mountRef} className="w-full h-full" style={{ overflow: "visible" }} />
     </div>
   );
 }
