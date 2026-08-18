@@ -10,303 +10,228 @@ export default function Cap3DCanvas() {
     const container = mountRef.current;
     if (!container) return;
 
-    // Dimensions
-    const width = container.clientWidth || 600;
-    const height = container.clientHeight || 600;
+    const width = container.clientWidth || 500;
+    const height = container.clientHeight || 500;
 
-    // Scene, Camera, Renderer
+    // Scene
     const scene = new THREE.Scene();
-    
-    // Position camera far enough back to guarantee ZERO cut-off during 360° rotation
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-    camera.position.set(0, 1.8, 15.5);
+
+    // Camera with generous frustum buffer so NO particles, strings or caps ever cut off
+    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 1000);
+    camera.position.set(0, 0.8, 14);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // Master Cap Group (scaled to stay safely within viewport bounding box)
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    const redLight = new THREE.PointLight(0xff1e42, 2, 20);
+    redLight.position.set(-4, 3, 5);
+    scene.add(redLight);
+
+    // Master Cap Group — Centered & Scaled to ensure 100% visibility without clipping
     const capGroup = new THREE.Group();
-    capGroup.scale.set(0.9, 0.9, 0.9);
+    capGroup.scale.set(0.68, 0.68, 0.68);
+    // Shift slightly down so top plate and hanging tassel string fit perfectly centered
+    capGroup.position.set(0, 0.3, 0);
     scene.add(capGroup);
 
-    // ── Colors ─────────────────────────────────────────────────────────────────
-    const COLOR_RED = 0xff1e42;
-    const COLOR_WHITE = 0xffffff;
-    const COLOR_DARK_RED = 0x990b22;
+    // ── 1. Top Plate (Mortarboard with Rounded Corners & Accent Rim) ─────────
+    const shape = new THREE.Shape();
+    const size = 2.4; // Half width
+    const radius = 0.25; // Corner radius
 
-    // ── 1. Intricate Mortarboard Top (Double Plate + Inset Grid) ───────────────
-    const boardWidth = 5.4;
-    const boardThickness = 0.18;
+    shape.moveTo(-size + radius, -size);
+    shape.lineTo(size - radius, -size);
+    shape.quadraticCurveTo(size, -size, size, -size + radius);
+    shape.lineTo(size, size - radius);
+    shape.quadraticCurveTo(size, size, size - radius, size);
+    shape.lineTo(-size + radius, size);
+    shape.quadraticCurveTo(-size, size, -size, size - radius);
+    shape.lineTo(-size, -size + radius);
+    shape.quadraticCurveTo(-size, -size, -size + radius, -size);
 
-    // Main Outer Board
-    const mainBoardGeo = new THREE.BoxGeometry(boardWidth, boardThickness, boardWidth, 6, 1, 6);
-    const boardWireframeGeo = new THREE.WireframeGeometry(mainBoardGeo);
-    const boardLineMat = new THREE.LineBasicMaterial({
-      color: COLOR_WHITE,
-      transparent: true,
-      opacity: 0.85,
+    const extrudeSettings = {
+      depth: 0.15,
+      bevelEnabled: true,
+      bevelSegments: 4,
+      steps: 1,
+      bevelSize: 0.05,
+      bevelThickness: 0.05,
+    };
+
+    const boardGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    boardGeo.rotateX(Math.PI / 2); // Make flat plate horizontal
+
+    // Dark sleek cap material
+    const capMat = new THREE.MeshStandardMaterial({
+      color: 0x121216,
+      roughness: 0.3,
+      metalness: 0.2,
     });
-    const boardLines = new THREE.LineSegments(boardWireframeGeo, boardLineMat);
-    capGroup.add(boardLines);
+    const mainBoard = new THREE.Mesh(boardGeo, capMat);
+    capGroup.add(mainBoard);
 
-    // Inset Top Lattice Grid
-    const gridPositions: number[] = [];
-    const gridSize = 5;
-    const step = boardWidth / gridSize;
-    const half = boardWidth / 2;
-    const topY = boardThickness / 2 + 0.02;
+    // Wireframe Overlay for technical pop
+    const boardWireGeo = new THREE.WireframeGeometry(boardGeo);
+    const boardWireMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+    const boardWire = new THREE.LineSegments(boardWireGeo, boardWireMat);
+    capGroup.add(boardWire);
 
-    for (let i = 0; i <= gridSize; i++) {
-      const pos = -half + i * step;
-      // Lines along X
-      gridPositions.push(-half, topY, pos, half, topY, pos);
-      // Lines along Z
-      gridPositions.push(pos, topY, -half, pos, topY, half);
-    }
-
-    const gridGeo = new THREE.BufferGeometry();
-    gridGeo.setAttribute("position", new THREE.Float32BufferAttribute(gridPositions, 3));
-    const gridMat = new THREE.LineBasicMaterial({
-      color: COLOR_RED,
-      transparent: true,
-      opacity: 0.6,
-    });
-    const topGrid = new THREE.LineSegments(gridGeo, gridMat);
-    capGroup.add(topGrid);
-
-    // Nodes at Top Grid Intersections (Dense Constellation Nodes)
-    const gridNodePositions: number[] = [];
-    for (let ix = 0; ix <= gridSize; ix++) {
-      for (let iz = 0; iz <= gridSize; iz++) {
-        const x = -half + ix * step;
-        const z = -half + iz * step;
-        gridNodePositions.push(x, topY, z);
-      }
-    }
-    const gridNodeGeo = new THREE.BufferGeometry();
-    gridNodeGeo.setAttribute("position", new THREE.Float32BufferAttribute(gridNodePositions, 3));
-    const gridNodeMat = new THREE.PointsMaterial({
-      color: COLOR_RED,
-      size: 0.22,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const gridNodes = new THREE.Points(gridNodeGeo, gridNodeMat);
-    capGroup.add(gridNodes);
-
-    // ── 2. Multi-Segmented Skull Crown (32 Segments + Rib Rings) ──────────────
-    const crownRadiusTop = 1.85;
-    const crownRadiusBottom = 2.05;
-    const crownHeight = 1.7;
-    const radialSegments = 32;
-    const heightSegments = 6;
-
-    const crownGeo = new THREE.CylinderGeometry(
-      crownRadiusTop,
-      crownRadiusBottom,
-      crownHeight,
-      radialSegments,
-      heightSegments,
-      true
-    );
-    crownGeo.translate(0, -crownHeight / 2 - boardThickness / 2, 0);
-
-    const crownWireframeGeo = new THREE.WireframeGeometry(crownGeo);
-    const crownLineMat = new THREE.LineBasicMaterial({
-      color: COLOR_WHITE,
-      transparent: true,
-      opacity: 0.65,
-    });
-    const crownLines = new THREE.LineSegments(crownWireframeGeo, crownLineMat);
-    capGroup.add(crownLines);
-
-    // Dense Node Points along Skull Vertices
-    const crownPos = crownGeo.attributes.position.array;
-    const crownNodePositions: number[] = [];
-    for (let i = 0; i < crownPos.length; i += 3) {
-      crownNodePositions.push(crownPos[i], crownPos[i + 1], crownPos[i + 2]);
-    }
-    const crownNodeGeo = new THREE.BufferGeometry();
-    crownNodeGeo.setAttribute("position", new THREE.Float32BufferAttribute(crownNodePositions, 3));
-    const crownNodeMat = new THREE.PointsMaterial({
-      color: COLOR_WHITE,
-      size: 0.14,
-      transparent: true,
-      opacity: 0.8,
-    });
-    const crownNodes = new THREE.Points(crownNodeGeo, crownNodeMat);
-    capGroup.add(crownNodes);
-
-    // Headband / Base Trim Ring
-    const bandGeo = new THREE.TorusGeometry(crownRadiusBottom, 0.08, 12, 32);
-    bandGeo.rotateX(Math.PI / 2);
-    bandGeo.translate(0, -crownHeight - boardThickness / 2, 0);
-    const bandLines = new THREE.LineSegments(
-      new THREE.WireframeGeometry(bandGeo),
-      new THREE.LineBasicMaterial({ color: COLOR_RED, opacity: 0.9, transparent: true })
-    );
-    capGroup.add(bandLines);
-
-    // ── 3. Top Button & Radial Starburst ───────────────────────────────────────
-    const buttonGeo = new THREE.SphereGeometry(0.25, 16, 16);
-    buttonGeo.translate(0, topY + 0.12, 0);
-    const buttonWire = new THREE.LineSegments(
-      new THREE.WireframeGeometry(buttonGeo),
-      new THREE.LineBasicMaterial({ color: COLOR_WHITE, opacity: 0.95, transparent: true })
-    );
-    capGroup.add(buttonWire);
-
-    // Starburst Radial Lines around Button
-    const starPositions: number[] = [];
-    const starRays = 12;
-    const rayLength = 0.9;
-    for (let i = 0; i < starRays; i++) {
-      const angle = (i / starRays) * Math.PI * 2;
-      starPositions.push(0, topY + 0.05, 0);
-      starPositions.push(Math.cos(angle) * rayLength, topY + 0.05, Math.sin(angle) * rayLength);
-    }
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
-    const starLines = new THREE.LineSegments(
-      starGeo,
-      new THREE.LineBasicMaterial({ color: COLOR_RED, opacity: 0.75, transparent: true })
-    );
-    capGroup.add(starLines);
-
-    // ── 4. Intricate Tassel & Hanging Threads ─────────────────────────────────
-    const cornerX = boardWidth * 0.46;
-    const cornerZ = boardWidth * 0.46;
-    const tasselCurvePoints = [
-      new THREE.Vector3(0, topY + 0.12, 0),
-      new THREE.Vector3(cornerX * 0.5, topY + 0.1, cornerZ * 0.5),
-      new THREE.Vector3(cornerX, topY + 0.05, cornerZ),
-      new THREE.Vector3(cornerX + 0.2, -0.6, cornerZ + 0.2),
-      new THREE.Vector3(cornerX + 0.25, -2.1, cornerZ + 0.25),
+    // Red Accent Outer Rim (Matching Reference Image Outer Trim)
+    const rimPoints = [
+      new THREE.Vector3(-size, 0.1, -size),
+      new THREE.Vector3(size, 0.1, -size),
+      new THREE.Vector3(size, 0.1, size),
+      new THREE.Vector3(-size, 0.1, size),
+      new THREE.Vector3(-size, 0.1, -size),
     ];
-    const tasselCurve = new THREE.CatmullRomCurve3(tasselCurvePoints);
-    const tasselTubeGeo = new THREE.TubeGeometry(tasselCurve, 30, 0.05, 8, false);
+    const rimGeo = new THREE.BufferGeometry().setFromPoints(rimPoints);
+    const rimMat = new THREE.LineBasicMaterial({ color: 0xff1e42, linewidth: 3 });
+    const rimLine = new THREE.Line(rimGeo, rimMat);
+    capGroup.add(rimLine);
+
+    // Corner Nodes on Plate
+    const cornerNodePositions = [
+      -size, 0.1, -size,
+      size, 0.1, -size,
+      size, 0.1, size,
+      -size, 0.1, size,
+      0, 0.1, 0, // Center
+    ];
+    const cornerNodeGeo = new THREE.BufferGeometry();
+    cornerNodeGeo.setAttribute("position", new THREE.Float32BufferAttribute(cornerNodePositions, 3));
+    const cornerNodes = new THREE.Points(
+      cornerNodeGeo,
+      new THREE.PointsMaterial({ color: 0xff1e42, size: 0.28, transparent: true, opacity: 0.95 })
+    );
+    capGroup.add(cornerNodes);
+
+    // ── 2. Skull Crown (Base Dome under Plate) ────────────────────────────────
+    const crownRadiusTop = 1.6;
+    const crownRadiusBottom = 1.85;
+    const crownHeight = 1.3;
+    const crownGeo = new THREE.CylinderGeometry(crownRadiusTop, crownRadiusBottom, crownHeight, 32);
+    crownGeo.translate(0, -crownHeight / 2 - 0.08, 0);
+
+    const crownMesh = new THREE.Mesh(crownGeo, capMat);
+    capGroup.add(crownMesh);
+
+    const crownWire = new THREE.LineSegments(
+      new THREE.WireframeGeometry(crownGeo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 })
+    );
+    capGroup.add(crownWire);
+
+    // Bottom Base Rim Band (Accent Blue/Red Collar in Ref Image)
+    const baseBandGeo = new THREE.TorusGeometry(crownRadiusBottom + 0.02, 0.08, 12, 32);
+    baseBandGeo.rotateX(Math.PI / 2);
+    baseBandGeo.translate(0, -crownHeight - 0.08, 0);
+    const baseBandMat = new THREE.MeshStandardMaterial({
+      color: 0xff1e42,
+      roughness: 0.2,
+      metalness: 0.5,
+    });
+    const baseBand = new THREE.Mesh(baseBandGeo, baseBandMat);
+    capGroup.add(baseBand);
+
+    // ── 3. Center Button ──────────────────────────────────────────────────────
+    const buttonGeo = new THREE.SphereGeometry(0.25, 20, 20);
+    buttonGeo.translate(0, 0.2, 0);
+    const buttonMat = new THREE.MeshStandardMaterial({
+      color: 0xff1e42,
+      roughness: 0.2,
+      metalness: 0.8,
+    });
+    const buttonMesh = new THREE.Mesh(buttonGeo, buttonMat);
+    capGroup.add(buttonMesh);
+
+    // ── 4. Thick Curving Tassel String & Flared Brush (Ref Image Style) ───────
+    // Path starting from center button, draping over front-left corner
+    const tasselPoints = [
+      new THREE.Vector3(0, 0.22, 0),
+      new THREE.Vector3(0.6, 0.2, 0.6),
+      new THREE.Vector3(1.7, 0.15, 1.7),
+      new THREE.Vector3(2.2, 0.05, 2.0),
+      new THREE.Vector3(2.35, -0.4, 2.0),
+      new THREE.Vector3(2.35, -1.2, 1.9),
+    ];
+    const tasselCurve = new THREE.CatmullRomCurve3(tasselPoints);
+    const tubeGeo = new THREE.TubeGeometry(tasselCurve, 40, 0.09, 12, false);
+    const stringMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.3,
+      metalness: 0.2,
+    });
+    const tasselString = new THREE.Mesh(tubeGeo, stringMat);
+    capGroup.add(tasselString);
+
+    // Tassel Cord Wireframe
     const tasselWire = new THREE.LineSegments(
-      new THREE.WireframeGeometry(tasselTubeGeo),
-      new THREE.LineBasicMaterial({ color: COLOR_RED, opacity: 0.95, transparent: true })
+      new THREE.WireframeGeometry(tubeGeo),
+      new THREE.LineBasicMaterial({ color: 0xff1e42, transparent: true, opacity: 0.5 })
     );
     capGroup.add(tasselWire);
 
-    // Tassel Ring Collar
-    const collarGeo = new THREE.TorusGeometry(0.2, 0.05, 8, 16);
-    collarGeo.rotateX(Math.PI / 2);
-    collarGeo.translate(cornerX + 0.25, -2.1, cornerZ + 0.25);
-    const collarWire = new THREE.LineSegments(
-      new THREE.WireframeGeometry(collarGeo),
-      new THREE.LineBasicMaterial({ color: COLOR_WHITE, opacity: 0.9, transparent: true })
-    );
-    capGroup.add(collarWire);
+    // Beaded Collar (3 stacked rings at bottom of cord matching ref image)
+    const collarGroup = new THREE.Group();
+    collarGroup.position.set(2.35, -1.35, 1.9);
 
-    // Multi-Strand Tassel Fringe Threads
-    const fringeStrands = 16;
-    const fringePositions: number[] = [];
-    const fringeNodes: number[] = [];
-    const fringeLength = 1.4;
-
-    for (let i = 0; i < fringeStrands; i++) {
-      const angle = (i / fringeStrands) * Math.PI * 2;
-      const rx = Math.cos(angle) * 0.18;
-      const rz = Math.sin(angle) * 0.18;
-
-      const startX = cornerX + 0.25 + rx;
-      const startY = -2.15;
-      const startZ = cornerZ + 0.25 + rz;
-
-      const endX = startX + (Math.random() - 0.5) * 0.15;
-      const endY = startY - fringeLength - Math.random() * 0.3;
-      const endZ = startZ + (Math.random() - 0.5) * 0.15;
-
-      fringePositions.push(startX, startY, startZ, endX, endY, endZ);
-      fringeNodes.push(endX, endY, endZ);
+    for (let b = 0; b < 3; b++) {
+      const beadGeo = new THREE.TorusGeometry(0.12, 0.04, 10, 20);
+      beadGeo.rotateX(Math.PI / 2);
+      beadGeo.translate(0, -b * 0.09, 0);
+      const beadMesh = new THREE.Mesh(
+        beadGeo,
+        new THREE.MeshStandardMaterial({ color: 0xff1e42, metalness: 0.5 })
+      );
+      collarGroup.add(beadMesh);
     }
+    capGroup.add(collarGroup);
 
-    const fringeGeo = new THREE.BufferGeometry();
-    fringeGeo.setAttribute("position", new THREE.Float32BufferAttribute(fringePositions, 3));
-    const fringeLines = new THREE.LineSegments(
-      fringeGeo,
-      new THREE.LineBasicMaterial({ color: COLOR_WHITE, opacity: 0.85, transparent: true })
+    // Flared Teardrop Tassel Brush (Golden/Red Tassel Tip from Ref Image)
+    const brushGeo = new THREE.ConeGeometry(0.28, 0.85, 20);
+    brushGeo.rotateX(Math.PI); // Point downwards
+    brushGeo.translate(2.35, -1.95, 1.9);
+
+    const brushMat = new THREE.MeshStandardMaterial({
+      color: 0xff1e42,
+      roughness: 0.2,
+      metalness: 0.6,
+    });
+    const tasselBrush = new THREE.Mesh(brushGeo, brushMat);
+    capGroup.add(tasselBrush);
+
+    const brushWire = new THREE.LineSegments(
+      new THREE.WireframeGeometry(brushGeo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.8, transparent: true })
     );
-    capGroup.add(fringeLines);
+    capGroup.add(brushWire);
 
-    // Fringe Terminal Node Lights
-    const fringeNodeGeo = new THREE.BufferGeometry();
-    fringeNodeGeo.setAttribute("position", new THREE.Float32BufferAttribute(fringeNodes, 3));
-    const fringeNodePoints = new THREE.Points(
-      fringeNodeGeo,
-      new THREE.PointsMaterial({ color: COLOR_RED, size: 0.18, transparent: true, opacity: 0.95 })
-    );
-    capGroup.add(fringeNodePoints);
-
-    // ── 5. Orbital Radar Rings & Nodes (Reference Image Style) ─────────────
-    const ringGroup = new THREE.Group();
-    scene.add(ringGroup);
-
-    const createRadarRing = (radius: number, color: number, tiltX: number, tiltZ: number, nodeCount: number) => {
-      const ringGeo = new THREE.BufferGeometry();
-      const pointsCount = 120;
-      const positions = [];
-      const nodePos = [];
-
-      for (let i = 0; i <= pointsCount; i++) {
-        const theta = (i / pointsCount) * Math.PI * 2;
-        const x = Math.cos(theta) * radius;
-        const z = Math.sin(theta) * radius;
-        positions.push(x, 0, z);
-
-        if (i % Math.floor(pointsCount / nodeCount) === 0) {
-          nodePos.push(x, 0, z);
-        }
-      }
-
-      ringGeo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      const line = new THREE.Line(
-        ringGeo,
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35 })
-      );
-      line.rotation.x = tiltX;
-      line.rotation.z = tiltZ;
-
-      // Node lights on the ring
-      const nGeo = new THREE.BufferGeometry();
-      nGeo.setAttribute("position", new THREE.Float32BufferAttribute(nodePos, 3));
-      const p = new THREE.Points(
-        nGeo,
-        new THREE.PointsMaterial({ color, size: 0.18, transparent: true, opacity: 0.85 })
-      );
-      p.rotation.x = tiltX;
-      p.rotation.z = tiltZ;
-
-      const subGroup = new THREE.Group();
-      subGroup.add(line);
-      subGroup.add(p);
-      return subGroup;
-    };
-
-    const ring1 = createRadarRing(5.6, COLOR_WHITE, Math.PI / 5, Math.PI / 6, 8);
-    const ring2 = createRadarRing(6.8, COLOR_RED, -Math.PI / 6, Math.PI / 3, 12);
-    const ring3 = createRadarRing(8.2, COLOR_WHITE, Math.PI / 3.5, -Math.PI / 4, 10);
-
-    ringGroup.add(ring1);
-    ringGroup.add(ring2);
-    ringGroup.add(ring3);
-
-    // ── 6. Constellation Particle Field ────────────────────────────────────────
-    const particleCount = 260;
+    // ── 5. Clean Floating Constellation Particles (Tight Bounds) ──────────────
+    // Constrained radius (r < 5.0) to strictly prevent any particle edge clipping
+    const particleCount = 120;
     const particlePositions = new Float32Array(particleCount * 3);
     const particleColors = new Float32Array(particleCount * 3);
 
     for (let i = 0; i < particleCount; i++) {
-      particlePositions[i * 3] = (Math.random() - 0.5) * 22;
-      particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 22;
-      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+      const r = 2.0 + Math.random() * 3.2; // Radius strictly inside viewport
+      const theta = Math.random() * Math.PI * 2;
+      const phi = (Math.random() - 0.5) * Math.PI * 0.8;
 
-      const isRed = Math.random() > 0.45;
+      particlePositions[i * 3] = r * Math.cos(theta) * Math.cos(phi);
+      particlePositions[i * 3 + 1] = r * Math.sin(phi);
+      particlePositions[i * 3 + 2] = r * Math.sin(theta) * Math.cos(phi);
+
+      const isRed = Math.random() > 0.5;
       particleColors[i * 3] = isRed ? 1.0 : 1.0;
       particleColors[i * 3 + 1] = isRed ? 0.12 : 1.0;
       particleColors[i * 3 + 2] = isRed ? 0.26 : 1.0;
@@ -316,20 +241,19 @@ export default function Cap3DCanvas() {
     particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
     particleGeo.setAttribute("color", new THREE.BufferAttribute(particleColors, 3));
 
-    const particles = new THREE.Points(
-      particleGeo,
-      new THREE.PointsMaterial({
-        size: 0.13,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.7,
-      })
-    );
+    const particleMat = new THREE.PointsMaterial({
+      size: 0.1,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.6,
+    });
+
+    const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // Initial rotation tilt for aesthetic 3D perspective
-    capGroup.rotation.x = 0.38;
-    capGroup.rotation.z = -0.12;
+    // Initial Aesthetic Rotation Angle (Matching Ref Image Perspective)
+    capGroup.rotation.x = 0.45;
+    capGroup.rotation.y = -0.4;
 
     // ── Animation Loop ────────────────────────────────────────────────────────
     let animationFrameId: number;
@@ -339,14 +263,9 @@ export default function Cap3DCanvas() {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      // Smooth continuous 3D rotation around Y
-      capGroup.rotation.y = elapsedTime * 0.42;
-      capGroup.position.y = Math.sin(elapsedTime * 1.1) * 0.22; // Gentle float bounce
-
-      // Rotate orbital radar rings at differential speeds
-      ring1.rotation.y = elapsedTime * 0.14;
-      ring2.rotation.y = -elapsedTime * 0.2;
-      ring3.rotation.y = elapsedTime * 0.08;
+      // Smooth subtle oscillation + 360 rotation
+      capGroup.rotation.y = -0.4 + elapsedTime * 0.35;
+      capGroup.position.y = 0.3 + Math.sin(elapsedTime * 1.2) * 0.15; // Gentle float
 
       particles.rotation.y = elapsedTime * 0.04;
 
@@ -355,7 +274,7 @@ export default function Cap3DCanvas() {
 
     animate();
 
-    // ── Responsive Resize Handler ──────────────────────────────────────────────
+    // Resize Handler
     const handleResize = () => {
       if (!container) return;
       const newW = container.clientWidth;
@@ -378,12 +297,11 @@ export default function Cap3DCanvas() {
   }, []);
 
   return (
-    <div className="relative w-full h-[540px] lg:h-[650px] flex items-center justify-center pointer-events-none select-none overflow-visible">
-      {/* Background Ambient Glows */}
-      <div className="absolute w-[420px] h-[420px] rounded-full bg-red-600/10 blur-[100px] pointer-events-none animate-pulse-slow" />
-      <div className="absolute w-[300px] h-[300px] rounded-full bg-white/5 blur-[80px] pointer-events-none" />
+    <div className="relative w-full h-[450px] lg:h-[540px] flex items-center justify-center pointer-events-none select-none overflow-visible">
+      {/* Background Soft Glow */}
+      <div className="absolute w-[320px] h-[320px] rounded-full bg-red-600/10 blur-[80px] pointer-events-none" />
 
-      {/* 3D WebGL Canvas */}
+      {/* WebGL Canvas */}
       <div ref={mountRef} className="w-full h-full overflow-visible" />
     </div>
   );

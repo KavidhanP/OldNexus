@@ -5,29 +5,23 @@ import Cap3DCanvas from "@/components/landing/Cap3DCanvas";
 import LeadCaptureForm, { LeadData } from "@/components/landing/LeadCaptureForm";
 import {
   Sparkles,
-  ArrowRight,
-  Compass,
-  Briefcase,
-  Trophy,
-  Send,
+  GraduationCap,
   Users,
   Download,
   Trash2,
   X,
-  GraduationCap,
+  ShieldCheck,
+  Award,
 } from "lucide-react";
 
 export default function LandingPage() {
   const [leads, setLeads] = useState<LeadData[]>([]);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
 
-  // Load saved leads from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem("nexus_leads");
-      if (stored) {
-        setLeads(JSON.parse(stored));
-      }
+      if (stored) setLeads(JSON.parse(stored));
     } catch (e) {
       console.error(e);
     }
@@ -63,173 +57,119 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#050507] text-white selection:bg-red-600 selection:text-white font-sans overflow-x-hidden">
-      {/* ── Background Grid & Technical Markings ───────────────────────────── */}
+    <div className="relative min-h-screen bg-[#050507] text-white font-sans overflow-x-hidden selection:bg-red-600 selection:text-white">
+      {/* ── Subtle Background & Grid ───────────────────────────────────────── */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        {/* Fine Technical Grid */}
         <div
-          className="absolute inset-0 opacity-[0.07]"
+          className="absolute inset-0 opacity-[0.05]"
           style={{
             backgroundImage: `linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)`,
-            backgroundSize: "60px 60px",
+            backgroundSize: "80px 80px",
           }}
         />
 
-        {/* Ambient Red Glow Spheres */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-red-600/15 rounded-full blur-[140px]" />
-        <div className="absolute bottom-10 right-10 w-[400px] h-[400px] bg-rose-700/10 rounded-full blur-[100px]" />
+        {/* Ambient Red Radial Glow */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-red-600/10 rounded-full blur-[120px]" />
 
-        {/* Corner Crosshairs (+) Reference Image Style */}
-        <div className="absolute top-6 left-6 text-neutral-600 font-mono text-xs select-none">+</div>
-        <div className="absolute top-6 right-6 text-neutral-600 font-mono text-xs select-none">+</div>
-        <div className="absolute bottom-6 left-6 text-neutral-600 font-mono text-xs select-none">+</div>
-        <div className="absolute bottom-6 right-6 text-neutral-600 font-mono text-xs select-none">+</div>
+        {/* Corner Target Markings (+) */}
+        <div className="absolute top-6 left-6 text-neutral-700 font-mono text-xs select-none">+</div>
+        <div className="absolute top-6 right-6 text-neutral-700 font-mono text-xs select-none">+</div>
+        <div className="absolute bottom-6 left-6 text-neutral-700 font-mono text-xs select-none">+</div>
+        <div className="absolute bottom-6 right-6 text-neutral-700 font-mono text-xs select-none">+</div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-6 pb-20">
-        {/* ── Header Navigation (Reference Image Style) ─────────────────────── */}
-        <header className="flex items-center justify-between py-4 border-b border-white/10 mb-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-6 pb-16 flex flex-col justify-between min-h-screen">
+        {/* ── Clean Minimalist Header ───────────────────────────────────────── */}
+        <header className="flex items-center justify-between py-4 border-b border-white/10 mb-8">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 p-0.5 shadow-[0_0_20px_rgba(225,29,72,0.5)]">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 p-0.5 shadow-[0_0_20px_rgba(225,29,72,0.4)]">
               <div className="w-full h-full bg-black rounded-[10px] flex items-center justify-center">
                 <GraduationCap className="w-5 h-5 text-red-500" />
               </div>
             </div>
-            <span className="font-bold text-xl tracking-tight text-white flex items-center gap-1">
+            <span className="font-bold text-xl tracking-tight text-white flex items-center gap-1 font-cinzel">
               uniqueyou<span className="text-red-500">.</span>
             </span>
           </div>
 
-          {/* Navigation Links */}
+          {/* Center Navigation Links */}
           <nav className="hidden md:flex items-center gap-8 text-xs font-medium text-neutral-400">
-            <a href="#vision" className="hover:text-white transition-colors">Our Vision</a>
-            <a href="#solutions" className="hover:text-white transition-colors">Solutions</a>
-            <a href="#community" className="hover:text-white transition-colors">Community</a>
-            <a href="#blog" className="hover:text-white transition-colors">Blog</a>
+            <a href="#about" className="hover:text-white transition-colors">About</a>
+            <a href="#admissions" className="hover:text-white transition-colors">Admissions</a>
+            <a href="#programs" className="hover:text-white transition-colors">Programs</a>
           </nav>
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-4">
-            {/* View Leads Count Button */}
             {leads.length > 0 && (
               <button
                 onClick={() => setShowLeadsModal(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-600/20 border border-red-500/40 text-red-400 text-xs font-semibold hover:bg-red-600/30 transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-600/20 border border-red-500/40 text-red-400 text-xs font-semibold hover:bg-red-600/30 transition-all"
               >
                 <Users className="w-3.5 h-3.5" />
                 Leads: {leads.length}
               </button>
             )}
 
-            <a href="#contact" className="hidden sm:inline-block text-xs font-medium text-neutral-300 hover:text-white transition-colors">
-              Contact us
-            </a>
             <button className="px-5 py-2 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 text-white font-medium text-xs backdrop-blur-md transition-all shadow-[0_0_15px_rgba(255,255,255,0.1)]">
               Get Involved
             </button>
           </div>
         </header>
 
-        {/* ── Main Hero Section ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-16">
-          {/* Left Column: Headline, Description & Lead Capture Form */}
-          <div className="lg:col-span-6 space-y-8">
-            <div className="space-y-4">
+        {/* ── Decluttered Hero Section ───────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center my-auto py-4">
+          {/* Left Column: Focused Headline & Lead Form */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-[11px] font-cinzel tracking-widest uppercase">
                 <Sparkles className="w-3.5 h-3.5 text-red-500" />
-                UNLEASHING ACADEMIC POTENTIAL IN THE AGE OF AI
+                UNLEASHING ACADEMIC POTENTIAL
               </div>
 
               <h1 className="font-serif-academic text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1]">
                 Shaping The <br />
                 <span className="text-red-500 font-serif-academic font-bold">
-                  Future of Work
+                  Future of Graduation
                 </span>
               </h1>
 
-              <p className="text-sm sm:text-base text-neutral-300 max-w-lg leading-relaxed font-sans">
-                Discover a new era of education and career mastery where technology and humanity converge. At UniqueYou, we’re shaping the next generation of academic pioneers.
+              <p className="text-xs sm:text-sm text-neutral-400 max-w-lg leading-relaxed font-sans">
+                Discover a new era of education where technology and human potential converge. Join the elite cohort of future leaders.
               </p>
             </div>
 
-            {/* Lead Form Component */}
-            <div id="contact" className="pt-2">
+            {/* Lead Form */}
+            <div id="admissions">
               <LeadCaptureForm onLeadSubmitted={handleLeadSubmitted} />
             </div>
           </div>
 
-          {/* Right Column: 3D Rotating Graduation Cap Visual (Reference Image Style) */}
+          {/* Right Column: Centered 3D Graduation Cap (Reference Alignment) */}
           <div className="lg:col-span-6 relative flex items-center justify-center">
-            {/* Background Radar Rings Graphic (Matching Reference Image) */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[500px] h-[500px] rounded-full border border-white/10 opacity-40 animate-spin-slow" />
-              <div className="absolute w-[360px] h-[360px] rounded-full border border-red-500/20 opacity-60" />
-            </div>
-
-            {/* 3D Graduation Cap Canvas */}
             <Cap3DCanvas />
           </div>
         </div>
 
-        {/* ── 4 Chamfered Feature Cards (Reference Image Bottom Grid) ───────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-          {/* Card 1 */}
-          <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-300 hover:border-red-500/40 hover:bg-white/[0.05] group">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
-              <Compass className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Harmonious Future</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Years exploring human-AI synergy proud to unveil groundbreaking harmonizing products.
-            </p>
+        {/* ── Minimalist Clean Footer Stats Bar ─────────────────────────────── */}
+        <footer className="pt-8 border-t border-white/10 mt-8 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center text-xs text-neutral-400">
+          <div className="flex items-center justify-center gap-2">
+            <Award className="w-4 h-4 text-red-500" />
+            <span>Priority Academic Admission</span>
           </div>
-
-          {/* Card 2 */}
-          <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-300 hover:border-red-500/40 hover:bg-white/[0.05] group">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
-              <Briefcase className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Workplace Evolution</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Evolving workplace: new roles, AI’s influence. Our platform navigates opportunities and pitfalls.
-            </p>
+          <div className="flex items-center justify-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-red-500" />
+            <span>Enterprise Privacy Protection</span>
           </div>
-
-          {/* Card 3 */}
-          <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-300 hover:border-red-500/40 hover:bg-white/[0.05] group">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
-              <Trophy className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Success Redefined</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Crafting roadmaps to unlock potential, maximize academic opportunities, and thrive in change.
-            </p>
+          <div className="flex items-center justify-center gap-2">
+            <Users className="w-4 h-4 text-red-500" />
+            <span>Global Alumni Community</span>
           </div>
-
-          {/* Card 4 */}
-          <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-300 hover:border-red-500/40 hover:bg-white/[0.05] group">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
-              <Send className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Elevate Your Journey</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Explore our future-focused approach: shape, unleash, and streamline academic potential.
-            </p>
-          </div>
-        </div>
-
-        {/* Carousel Slider Indicator (Matching Reference Image `o . .`) */}
-        <div className="flex items-center justify-center gap-2 mt-8">
-          <span className="w-3 h-3 rounded-full border border-red-500 bg-red-500/20 flex items-center justify-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-          </span>
-          <span className="w-2 h-2 rounded-full bg-white/20" />
-          <span className="w-2 h-2 rounded-full bg-white/20" />
-        </div>
+        </footer>
       </div>
 
-      {/* ── Captured Leads Inspection Modal ─────────────────────────────────── */}
+      {/* ── Captured Leads Modal ───────────────────────────────────────────── */}
       {showLeadsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
           <div className="relative w-full max-w-4xl rounded-2xl border border-white/15 bg-[#0a0a0e] p-6 lg:p-8 shadow-2xl space-y-6 max-h-[90vh] flex flex-col">
@@ -239,7 +179,7 @@ export default function LandingPage() {
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white">Captured Leads Manager</h3>
+                  <h3 className="text-xl font-bold text-white font-cinzel">Captured Leads Manager</h3>
                   <p className="text-xs text-neutral-400">Total Records: {leads.length}</p>
                 </div>
               </div>
