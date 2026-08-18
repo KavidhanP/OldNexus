@@ -66,8 +66,8 @@ export default function Cap3DCanvas() {
 
     const PS = 3.0;
 
-    /* 1a — Plate top face → RED  (3200 pts) */
-    for (let i = 0; i < 3200; i++) {
+    /* 1a — Plate top face → RED  (5200 pts) */
+    for (let i = 0; i < 5200; i++) {
       pts.push({
         x: (Math.random() * 2 - 1) * PS,
         y: 0,
@@ -76,8 +76,8 @@ export default function Cap3DCanvas() {
       });
     }
 
-    /* 1b — Plate edges → WHITE  (800 pts) */
-    for (let i = 0; i < 800; i++) {
+    /* 1b — Plate edges → WHITE  (3800 pts) */
+    for (let i = 0; i < 3800; i++) {
       const t = Math.random();
       const d = -0.20 * Math.random();
       const side = Math.floor(Math.random() * 4);
