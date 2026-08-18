@@ -16,6 +16,14 @@
   --topbar-height: 64px;
 }
 
+.font-cinzel {
+  font-family: 'Cinzel', serif;
+}
+
+.font-serif-academic {
+  font-family: 'Playfair Display', 'Cinzel', Georgia, serif;
+}
+
 /* ─── Base Reset ──────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;

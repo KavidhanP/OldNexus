@@ -136,19 +136,19 @@ export default function LandingPage() {
           {/* Left Column: Headline, Description & Lead Capture Form */}
           <div className="lg:col-span-6 space-y-8">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-400 text-[11px] font-mono uppercase tracking-widest">
-                <Sparkles className="w-3 h-3 text-red-500" />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-[11px] font-cinzel tracking-widest uppercase">
+                <Sparkles className="w-3.5 h-3.5 text-red-500" />
                 UNLEASHING ACADEMIC POTENTIAL IN THE AGE OF AI
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
+              <h1 className="font-serif-academic text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1]">
                 Shaping The <br />
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-neutral-200 to-red-500">
+                <span className="text-red-500 font-serif-academic font-bold">
                   Future of Work
                 </span>
               </h1>
 
-              <p className="text-sm sm:text-base text-neutral-400 max-w-lg leading-relaxed">
+              <p className="text-sm sm:text-base text-neutral-300 max-w-lg leading-relaxed font-sans">
                 Discover a new era of education and career mastery where technology and humanity converge. At UniqueYou, we’re shaping the next generation of academic pioneers.
               </p>
             </div>
@@ -179,7 +179,7 @@ export default function LandingPage() {
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
               <Compass className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">Harmonious Future</h3>
+            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Harmonious Future</h3>
             <p className="text-xs text-neutral-400 leading-relaxed">
               Years exploring human-AI synergy proud to unveil groundbreaking harmonizing products.
             </p>
@@ -190,7 +190,7 @@ export default function LandingPage() {
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
               <Briefcase className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">Workplace Evolution</h3>
+            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Workplace Evolution</h3>
             <p className="text-xs text-neutral-400 leading-relaxed">
               Evolving workplace: new roles, AI’s influence. Our platform navigates opportunities and pitfalls.
             </p>
@@ -201,7 +201,7 @@ export default function LandingPage() {
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
               <Trophy className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">Success Redefined</h3>
+            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Success Redefined</h3>
             <p className="text-xs text-neutral-400 leading-relaxed">
               Crafting roadmaps to unlock potential, maximize academic opportunities, and thrive in change.
             </p>
@@ -212,7 +212,7 @@ export default function LandingPage() {
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-4 group-hover:text-red-500 group-hover:border-red-500/40 transition-colors">
               <Send className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">Elevate Your Journey</h3>
+            <h3 className="text-base font-bold text-white mb-2 font-cinzel">Elevate Your Journey</h3>
             <p className="text-xs text-neutral-400 leading-relaxed">
               Explore our future-focused approach: shape, unleash, and streamline academic potential.
             </p>
