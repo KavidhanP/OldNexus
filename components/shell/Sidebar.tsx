@@ -12,6 +12,7 @@ import {
   Shield,
   ChevronRight,
   Zap,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,10 +31,12 @@ const secondaryItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  if (pathname === "/landing") return null;
   const { state } = useNexus();
   
   const navItems: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Lead Landing", href: "/landing", icon: GraduationCap },
     { label: "Contracts", href: "/contracts", icon: FileText, badge: state.contracts.length > 0 ? String(state.contracts.length) : undefined },
     { label: "Fortress CRM", href: "/crm", icon: Users },
     { label: "M&A Audit", href: "/audit", icon: Search, badge: state.auditScans.length > 0 ? String(state.auditScans.length) : undefined },

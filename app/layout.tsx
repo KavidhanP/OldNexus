@@ -2,16 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/shell/Sidebar";
 import TopBar from "@/components/shell/TopBar";
+import AppLayoutWrapper from "@/components/shell/AppLayoutWrapper";
 import { NexusProvider } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: {
     template: "%s | Nexus OS",
-    default: "Nexus OS — Insurance & PE Intelligence Platform",
+    default: "UniqueYou — Shaping The Future of Work & Graduation",
   },
   description:
-    "Nexus OS bridges insurance brokerage and private equity with AI-powered contract analysis, M&A due diligence scanning, and HNWI wealth management.",
-  keywords: ["insurance", "private equity", "M&A", "due diligence", "premium discrepancy", "HNWI"],
+    "Discover a new era of education and career potential with AI-driven lead capture and 3D constellation intelligence.",
+  keywords: ["landing page", "leads", "education", "3d cap", "future of work"],
 };
 
 export default function RootLayout({
@@ -33,15 +34,7 @@ export default function RootLayout({
         <NexusProvider>
           <Sidebar />
           <TopBar />
-          <main
-            className="min-h-screen"
-            style={{
-              marginLeft: "var(--sidebar-width)",
-              paddingTop: "var(--topbar-height)",
-            }}
-          >
-            <div className="p-6 animate-fade-in">{children}</div>
-          </main>
+          <AppLayoutWrapper>{children}</AppLayoutWrapper>
         </NexusProvider>
       </body>
     </html>

@@ -42,7 +42,11 @@ function LiveClock() {
   );
 }
 
+import { usePathname } from "next/navigation";
+
 export default function TopBar() {
+  const pathname = usePathname();
+  if (pathname === "/landing") return null;
   const [tickers] = useState<MarketTicker[]>(mockTickers);
 
   return (
