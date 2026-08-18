@@ -31,7 +31,7 @@ const secondaryItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  if (pathname === "/landing") return null;
+  if (pathname === "/landing" || pathname === "/") return null;
   const { state } = useNexus();
   
   const navItems: NavItem[] = [

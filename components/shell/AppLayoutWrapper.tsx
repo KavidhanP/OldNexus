@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 export default function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLanding = pathname === "/landing";
+  const isLanding = pathname === "/landing" || pathname === "/";
 
   if (isLanding) {
     return <div className="min-h-screen bg-[#050507]">{children}</div>;

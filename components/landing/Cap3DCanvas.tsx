@@ -179,7 +179,7 @@ export default function Cap3DCanvas() {
     const crownHeight = 1.5;
     const crownSegments = 32;
 
-    const crownGeo = new THREE.CylinderGeometry(crownTopR, crownRadiusBottom, crownHeight, crownSegments, 4);
+    const crownGeo = new THREE.CylinderGeometry(crownTopR, crownBottomR, crownHeight, crownSegments, 4);
     crownGeo.translate(0, -crownHeight / 2 - 0.1, 0);
 
     const crownMesh = new THREE.Mesh(crownGeo, capMat);
