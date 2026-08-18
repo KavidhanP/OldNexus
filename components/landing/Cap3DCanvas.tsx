@@ -43,11 +43,13 @@ export default function Cap3DCanvas() {
     const PALETTE = [
       new THREE.Color(0xffffff),  // white
       new THREE.Color(0xffffff),  // white (2× frequency)
-      new THREE.Color(0xf0d060),  // gold / yellow
-      new THREE.Color(0xf0d060),  // gold (2× frequency)
+      new THREE.Color(0xffffff),  // white (3× frequency)
       new THREE.Color(0xe11d48),  // crimson red
-      new THREE.Color(0xc084fc),  // violet / purple
-      new THREE.Color(0x34d399),  // teal / mint green
+      new THREE.Color(0xe11d48),  // crimson red (2×)
+      new THREE.Color(0xcc1133),  // deep red
+      new THREE.Color(0x111111),  // black
+      new THREE.Color(0x111111),  // black (2×)
+      new THREE.Color(0x1a1a1a),  // near-black
     ];
     const rndCol = () => PALETTE[Math.floor(Math.random() * PALETTE.length)];
 
@@ -66,14 +68,14 @@ export default function Cap3DCanvas() {
     const PS = 3.0;   // plate half-size
 
     /* 1a — Plate top face */
-    for (let i = 0; i < 320; i++) {
+    for (let i = 0; i < 1100; i++) {
       const x = (Math.random() * 2 - 1) * PS;
       const z = (Math.random() * 2 - 1) * PS;
       surfacePts.push({ x, y: 0, z });
     }
 
     /* 1b — Plate edges (4 sides, top & bottom strip) */
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 380; i++) {
       const t  = Math.random();
       const d  = -0.20 * Math.random();          // plate depth
       const side = Math.floor(Math.random() * 4);
@@ -85,8 +87,8 @@ export default function Cap3DCanvas() {
       surfacePts.push({ x, y: d, z });
     }
 
-    /* 1c — Plate bottom face (sparse) */
-    for (let i = 0; i < 80; i++) {
+    /* 1c — Plate bottom face */
+    for (let i = 0; i < 350; i++) {
       const x = (Math.random() * 2 - 1) * PS;
       const z = (Math.random() * 2 - 1) * PS;
       surfacePts.push({ x, y: -0.20, z });
@@ -96,7 +98,7 @@ export default function Cap3DCanvas() {
     const crownTopR = 1.85;
     const crownBotR = 2.18;
     const crownH    = 1.55;
-    for (let i = 0; i < 280; i++) {
+    for (let i = 0; i < 850; i++) {
       const t  = Math.random();                  // 0 = top, 1 = bottom
       const a  = Math.random() * Math.PI * 2;
       const r  = THREE.MathUtils.lerp(crownTopR, crownBotR, t);
@@ -107,14 +109,14 @@ export default function Cap3DCanvas() {
     }
 
     /* 1e — Crown base collar ring */
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 200; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = crownBotR + 0.06;
       surfacePts.push({ x: Math.cos(a) * r, y: -crownH - 0.10, z: Math.sin(a) * r });
     }
 
     /* 1f — Centre button (hemisphere) */
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 120; i++) {
       const theta = Math.random() * Math.PI * 2;
       const phi   = Math.random() * Math.PI * 0.5;  // upper hemisphere
       const r     = 0.35;
@@ -135,8 +137,8 @@ export default function Cap3DCanvas() {
       new THREE.Vector3(2.68,  -1.15, 2.08),
       new THREE.Vector3(2.68,  -1.48, 2.08),
     ]);
-    for (let i = 0; i < 60; i++) {
-      const pt = cordPath.getPoint(i / 60);
+    for (let i = 0; i < 120; i++) {
+      const pt = cordPath.getPoint(i / 120);
       // scatter slightly around the curve
       surfacePts.push({
         x: pt.x + (Math.random() - 0.5) * 0.16,
@@ -147,7 +149,7 @@ export default function Cap3DCanvas() {
 
     /* 1h — Tassel brush (cone / teardrop) */
     const brushCx = 2.68, brushCz = 2.08;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 120; i++) {
       const t  = Math.random();                   // 0 = top, 1 = tip
       const a  = Math.random() * Math.PI * 2;
       const r  = (0.35 * Math.sin(t * Math.PI)) * (1 - t * 0.4);
@@ -155,7 +157,7 @@ export default function Cap3DCanvas() {
       surfacePts.push({ x: brushCx + Math.cos(a) * r, y, z: brushCz + Math.sin(a) * r });
     }
 
-    const NUM_PTS = surfacePts.length; // ~1000 pts
+    const NUM_PTS = surfacePts.length; // ~3100+ pts
 
     /* ═══════════════════════════════════════════════════════
        STEP 2 — At each point, create a tiny triangle outline
@@ -325,10 +327,10 @@ export default function Cap3DCanvas() {
 
     const STAR_COLS = [
       new THREE.Color(0xffffff),
-      new THREE.Color(0xf0d060),
       new THREE.Color(0xe11d48),
-      new THREE.Color(0xc084fc),
-      new THREE.Color(0x34d399),
+      new THREE.Color(0xcc1133),
+      new THREE.Color(0xffffff),
+      new THREE.Color(0x888888),
     ];
     const starColArr = stars.map((_, i) => STAR_COLS[i % STAR_COLS.length]);
 
