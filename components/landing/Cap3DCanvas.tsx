@@ -4,17 +4,9 @@ import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 /* ─────────────────────────────────────────────────────────────
-   Cap3DCanvas — Moffett AI-style point-cloud mesh network
-   ─────────────────────────────────────────────────────────────
-   Points scattered across the graduation cap surface, connected
-   by thin lines to nearby neighbours.  No triangles — just
-   nodes + edges forming a clean wireframe mesh.
-
-   Colour zones:
-     • Cap body (plate top, crown)  → crimson RED
-     • Borders, collar, button      → WHITE
-     • Plate underside              → charcoal
-     • Tassel cord + brush          → WHITE
+   Cap3DCanvas — Moffett AI-style high-density mesh network
+   ~130 000 nodes, spatial-hash connections, hub glow nodes.
+   Camera positioned to guarantee ZERO clipping at any angle.
    ──────────────────────────────────────────────────────────── */
 
 export default function Cap3DCanvas() {
@@ -28,8 +20,11 @@ export default function Cap3DCanvas() {
     const H = container.clientHeight || 700;
 
     const scene  = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(62, W / H, 0.1, 600);
-    camera.position.set(0, 0.3, 8);
+    /* Camera at z=11 with FOV 54 — the cap's bounding sphere
+       (radius ≈ 5) fits fully inside the frustum at all rotations.
+       half-height at z=0 = 11 × tan(27°) ≈ 5.6 > 5.0 ✓          */
+    const camera = new THREE.PerspectiveCamera(54, W / H, 0.1, 600);
+    camera.position.set(0, 0.3, 11);
     camera.lookAt(0, -0.4, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -47,7 +42,7 @@ export default function Cap3DCanvas() {
     const CHARCOAL = new THREE.Color(0x1a1a1e);
     const DARK     = new THREE.Color(0x0e0e10);
 
-    const vary = (base: THREE.Color, amt = 0.06): THREE.Color => {
+    const vary = (base: THREE.Color, amt = 0.05): THREE.Color => {
       const c = base.clone();
       c.r = Math.min(1, Math.max(0, c.r + (Math.random() - 0.5) * amt));
       c.g = Math.min(1, Math.max(0, c.g + (Math.random() - 0.5) * amt));
@@ -62,18 +57,30 @@ export default function Cap3DCanvas() {
     scene.add(capGroup);
 
     /* ═══════════════════════════════════════════════════════
-       1.  SAMPLE SURFACE POINTS
+       1.  SAMPLE ~130 000 SURFACE POINTS
     ═══════════════════════════════════════════════════════ */
-    type Pt = { x: number; y: number; z: number; col: THREE.Color; size: number };
-    const pts: Pt[] = [];
     const PS = 3.0;
+    const cTR = 1.85, cBR = 2.18, cH = 1.55;
+
+    // Pre-allocate flat arrays for maximum performance
+    const MAX_N   = 135000;
+    const posArr  = new Float32Array(MAX_N * 3);
+    const colArr  = new Float32Array(MAX_N * 3);
+    let N = 0;
 
     const addPt = (x: number, y: number, z: number, col: THREE.Color) => {
-      pts.push({ x, y, z, col, size: 0.03 + Math.random() * 0.05 });
+      if (N >= MAX_N) return;
+      posArr[N * 3]     = x;
+      posArr[N * 3 + 1] = y;
+      posArr[N * 3 + 2] = z;
+      colArr[N * 3]     = col.r;
+      colArr[N * 3 + 1] = col.g;
+      colArr[N * 3 + 2] = col.b;
+      N++;
     };
 
-    /* 1a — Plate top → RED (4800) */
-    for (let i = 0; i < 4800; i++) {
+    /* 1a — Plate top → RED (48 000) */
+    for (let i = 0; i < 48000; i++) {
       addPt(
         (Math.random() * 2 - 1) * PS, 0,
         (Math.random() * 2 - 1) * PS,
@@ -81,8 +88,8 @@ export default function Cap3DCanvas() {
       );
     }
 
-    /* 1b — Plate edges → WHITE (3200) */
-    for (let i = 0; i < 3200; i++) {
+    /* 1b — Plate edges → WHITE (32 000) */
+    for (let i = 0; i < 32000; i++) {
       const t = Math.random();
       const d = -0.22 * Math.random();
       const side = Math.floor(Math.random() * 4);
@@ -91,11 +98,11 @@ export default function Cap3DCanvas() {
       if (side === 1) { x = -PS + t * 2 * PS; z =  PS; }
       if (side === 2) { x = -PS;              z = -PS + t * 2 * PS; }
       if (side === 3) { x =  PS;              z = -PS + t * 2 * PS; }
-      addPt(x, d, z, vary(WHITE, 0.04));
+      addPt(x, d, z, vary(WHITE, 0.03));
     }
 
-    /* 1c — Plate bottom → CHARCOAL (500) */
-    for (let i = 0; i < 500; i++) {
+    /* 1c — Plate bottom → CHARCOAL (5 000) */
+    for (let i = 0; i < 5000; i++) {
       addPt(
         (Math.random() * 2 - 1) * PS, -0.22,
         (Math.random() * 2 - 1) * PS,
@@ -103,9 +110,8 @@ export default function Cap3DCanvas() {
       );
     }
 
-    /* 1d — Crown → RED (2800) */
-    const cTR = 1.85, cBR = 2.18, cH = 1.55;
-    for (let i = 0; i < 2800; i++) {
+    /* 1d — Crown → RED (28 000) */
+    for (let i = 0; i < 28000; i++) {
       const t = Math.random();
       const a = Math.random() * Math.PI * 2;
       const r = THREE.MathUtils.lerp(cTR, cBR, t);
@@ -113,24 +119,24 @@ export default function Cap3DCanvas() {
             vary(Math.random() < 0.7 ? RED : DEEP_RED));
     }
 
-    /* 1e — Crown collar → WHITE (500) */
-    for (let i = 0; i < 500; i++) {
+    /* 1e — Crown collar → WHITE (5 000) */
+    for (let i = 0; i < 5000; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = cBR + 0.06;
       addPt(Math.cos(a) * r, -cH - 0.10 - Math.random() * 0.18, Math.sin(a) * r,
-            vary(WHITE, 0.04));
+            vary(WHITE, 0.03));
     }
 
-    /* 1f — Button → WHITE (250) */
-    for (let i = 0; i < 250; i++) {
+    /* 1f — Button → WHITE (2 500) */
+    for (let i = 0; i < 2500; i++) {
       const th = Math.random() * Math.PI * 2;
       const ph = Math.random() * Math.PI * 0.5;
       const r  = 0.35;
       addPt(r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph) + 0.12,
-            r * Math.sin(ph) * Math.sin(th), vary(WHITE, 0.04));
+            r * Math.sin(ph) * Math.sin(th), vary(WHITE, 0.03));
     }
 
-    /* 1g — Tassel cord → WHITE (550) */
+    /* 1g — Tassel cord → WHITE (5 500) */
     const cordPath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0.28, 0),
       new THREE.Vector3(0.6, 0.24, 0.58),
@@ -140,75 +146,75 @@ export default function Cap3DCanvas() {
       new THREE.Vector3(2.68, -1.15, 2.08),
       new THREE.Vector3(2.68, -1.48, 2.08),
     ]);
-    for (let i = 0; i < 550; i++) {
-      const pt = cordPath.getPoint(i / 550);
-      addPt(pt.x + (Math.random() - 0.5) * 0.18,
-            pt.y + (Math.random() - 0.5) * 0.18,
-            pt.z + (Math.random() - 0.5) * 0.18,
-            vary(SOFT_WHT, 0.05));
+    for (let i = 0; i < 5500; i++) {
+      const pt = cordPath.getPoint(i / 5500);
+      addPt(pt.x + (Math.random() - 0.5) * 0.20,
+            pt.y + (Math.random() - 0.5) * 0.20,
+            pt.z + (Math.random() - 0.5) * 0.20,
+            vary(SOFT_WHT, 0.04));
     }
 
-    /* 1h — Tassel brush → WHITE (600) */
+    /* 1h — Tassel brush → WHITE (4 000) */
     const bCx = 2.68, bCz = 2.08;
-    for (let i = 0; i < 600; i++) {
+    for (let i = 0; i < 4000; i++) {
       const t = Math.random();
       const a = Math.random() * Math.PI * 2;
       const r = (0.38 * Math.sin(t * Math.PI)) * (1 - t * 0.4);
       addPt(bCx + Math.cos(a) * r, -1.55 - t * 1.15, bCz + Math.sin(a) * r,
-            vary(SOFT_WHT, 0.05));
+            vary(SOFT_WHT, 0.04));
     }
 
-    const N = pts.length; // ~13 200
+    // Trim arrays to actual count
+    const posUsed = posArr.subarray(0, N * 3);
+    const colUsed = colArr.subarray(0, N * 3);
 
     /* ═══════════════════════════════════════════════════════
-       2.  SPATIAL HASH for fast neighbour lookup
+       2.  SPATIAL HASH → CONNECTING LINES
+           Only process every 4th point for performance
     ═══════════════════════════════════════════════════════ */
-    const CELL = 0.55; // grid cell size = connection threshold
+    const CELL = 0.45;
     const grid = new Map<string, number[]>();
 
-    const cellKey = (x: number, y: number, z: number) =>
+    const ck = (x: number, y: number, z: number) =>
       `${Math.floor(x / CELL)},${Math.floor(y / CELL)},${Math.floor(z / CELL)}`;
 
+    // Index every point into the grid
     for (let i = 0; i < N; i++) {
-      const k = cellKey(pts[i].x, pts[i].y, pts[i].z);
+      const k = ck(posUsed[i*3], posUsed[i*3+1], posUsed[i*3+2]);
       if (!grid.has(k)) grid.set(k, []);
       grid.get(k)!.push(i);
     }
 
-    /* ═══════════════════════════════════════════════════════
-       3.  CONNECTING LINES (mesh edges)
-    ═══════════════════════════════════════════════════════ */
+    // Build connection lines (only every 4th point does lookups)
     const lineV: number[] = [];
     const lineC: number[] = [];
-    const MAX_CONN = 3;        // max connections per node
-    const DIST2    = CELL * CELL;
+    const DIST2 = CELL * CELL;
 
-    for (let i = 0; i < N; i++) {
-      const pi = pts[i];
-      const cx = Math.floor(pi.x / CELL);
-      const cy = Math.floor(pi.y / CELL);
-      const cz = Math.floor(pi.z / CELL);
+    for (let i = 0; i < N; i += 4) {
+      const px = posUsed[i*3], py = posUsed[i*3+1], pz = posUsed[i*3+2];
+      const cx = Math.floor(px / CELL);
+      const cy = Math.floor(py / CELL);
+      const cz = Math.floor(pz / CELL);
       let found = 0;
 
-      // Check 27 neighbouring cells
-      outer:
+      search:
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
           for (let dz = -1; dz <= 1; dz++) {
-            const nk = `${cx + dx},${cy + dy},${cz + dz}`;
-            const cell = grid.get(nk);
+            const cell = grid.get(`${cx+dx},${cy+dy},${cz+dz}`);
             if (!cell) continue;
             for (const j of cell) {
-              if (j <= i) continue; // avoid duplicates
-              const pj = pts[j];
-              const d2 = (pi.x-pj.x)**2 + (pi.y-pj.y)**2 + (pi.z-pj.z)**2;
-              if (d2 < DIST2) {
-                lineV.push(pi.x, pi.y, pi.z, pj.x, pj.y, pj.z);
-                // blend colours: bright at nodes, dim at midpoint
-                lineC.push(pi.col.r, pi.col.g, pi.col.b,
-                           pj.col.r * 0.5, pj.col.g * 0.5, pj.col.b * 0.5);
+              if (j <= i) continue;
+              const qx = posUsed[j*3], qy = posUsed[j*3+1], qz = posUsed[j*3+2];
+              const d2 = (px-qx)**2 + (py-qy)**2 + (pz-qz)**2;
+              if (d2 < DIST2 && d2 > 0.01) {
+                lineV.push(px, py, pz, qx, qy, qz);
+                lineC.push(
+                  colUsed[i*3], colUsed[i*3+1], colUsed[i*3+2],
+                  colUsed[j*3]*0.4, colUsed[j*3+1]*0.4, colUsed[j*3+2]*0.4,
+                );
                 found++;
-                if (found >= MAX_CONN) break outer;
+                if (found >= 2) break search;
               }
             }
           }
@@ -220,68 +226,51 @@ export default function Cap3DCanvas() {
     lineGeo.setAttribute("position", new THREE.Float32BufferAttribute(lineV, 3));
     lineGeo.setAttribute("color",    new THREE.Float32BufferAttribute(lineC, 3));
     capGroup.add(new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false,
+      vertexColors: true, transparent: true, opacity: 0.30, depthWrite: false,
     })));
 
     /* ═══════════════════════════════════════════════════════
-       4.  NODE DOTS — two layers (base + bright)
+       3.  NODE DOTS — two layers
     ═══════════════════════════════════════════════════════ */
-    const dotP = new Float32Array(N * 3);
-    const dotC = new Float32Array(N * 3);
-    const dotS = new Float32Array(N);
-
-    for (let i = 0; i < N; i++) {
-      dotP[i*3]   = pts[i].x;
-      dotP[i*3+1] = pts[i].y;
-      dotP[i*3+2] = pts[i].z;
-      dotC[i*3]   = pts[i].col.r;
-      dotC[i*3+1] = pts[i].col.g;
-      dotC[i*3+2] = pts[i].col.b;
-      dotS[i]     = pts[i].size;
-    }
-
     const dotGeo = new THREE.BufferGeometry();
-    dotGeo.setAttribute("position", new THREE.BufferAttribute(dotP, 3));
-    dotGeo.setAttribute("color",    new THREE.BufferAttribute(dotC, 3));
+    dotGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(posUsed), 3));
+    dotGeo.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(colUsed), 3));
 
-    /* Layer 1 — solid dots */
+    /* Solid dots */
     capGroup.add(new THREE.Points(dotGeo, new THREE.PointsMaterial({
-      size: 0.055, vertexColors: true, transparent: true, opacity: 0.92,
+      size: 0.035, vertexColors: true, transparent: true, opacity: 0.90,
       depthWrite: false, sizeAttenuation: true,
     })));
 
-    /* Layer 2 — soft additive glow halos */
+    /* Soft glow halos */
     capGroup.add(new THREE.Points(dotGeo, new THREE.PointsMaterial({
-      size: 0.12, vertexColors: true, transparent: true, opacity: 0.22,
+      size: 0.09, vertexColors: true, transparent: true, opacity: 0.15,
       blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
     })));
 
     /* ═══════════════════════════════════════════════════════
-       5.  BRIGHT HUB NODES — ~3% of points are larger/brighter
+       4.  BRIGHT HUB NODES (~2%)
     ═══════════════════════════════════════════════════════ */
-    const hubCount = Math.floor(N * 0.03);
-    const hubP = new Float32Array(hubCount * 3);
-    const hubC = new Float32Array(hubCount * 3);
-
-    for (let h = 0; h < hubCount; h++) {
+    const hubN = Math.floor(N * 0.02);
+    const hubP = new Float32Array(hubN * 3);
+    const hubC = new Float32Array(hubN * 3);
+    for (let h = 0; h < hubN; h++) {
       const idx = Math.floor(Math.random() * N);
-      hubP[h*3]   = pts[idx].x;
-      hubP[h*3+1] = pts[idx].y;
-      hubP[h*3+2] = pts[idx].z;
-      hubC[h*3]   = 1; hubC[h*3+1] = 1; hubC[h*3+2] = 1; // bright white
+      hubP[h*3]   = posUsed[idx*3];
+      hubP[h*3+1] = posUsed[idx*3+1];
+      hubP[h*3+2] = posUsed[idx*3+2];
+      hubC[h*3] = 1; hubC[h*3+1] = 1; hubC[h*3+2] = 1;
     }
-
     const hubGeo = new THREE.BufferGeometry();
     hubGeo.setAttribute("position", new THREE.BufferAttribute(hubP, 3));
     hubGeo.setAttribute("color",    new THREE.BufferAttribute(hubC, 3));
-
     capGroup.add(new THREE.Points(hubGeo, new THREE.PointsMaterial({
-      size: 0.18, vertexColors: true, transparent: true, opacity: 0.75,
+      size: 0.14, vertexColors: true, transparent: true, opacity: 0.65,
       blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
     })));
 
     /* ═══════════════════════════════════════════════════════
-       6.  10 SLOW SHOOTING STARS
+       5.  10 SLOW SHOOTING STARS
     ═══════════════════════════════════════════════════════ */
     const NUM_STARS = 10;
     type Star = { pos: THREE.Vector3; dir: THREE.Vector3; speed: number; trailLen: number; life: number; maxLife: number };
@@ -289,7 +278,7 @@ export default function Cap3DCanvas() {
     const spawnStar = (): Star => {
       const th = Math.random() * Math.PI * 2;
       const ph = Math.acos(2 * Math.random() - 1);
-      const r  = 5 + Math.random() * 3.5;
+      const r  = 5.5 + Math.random() * 3;
       const pos = new THREE.Vector3(r*Math.sin(ph)*Math.cos(th), r*Math.cos(ph), r*Math.sin(ph)*Math.sin(th));
       const tan = new THREE.Vector3(-Math.sin(th), 0, Math.cos(th)).normalize();
       const rad = pos.clone().normalize();
@@ -365,7 +354,7 @@ export default function Cap3DCanvas() {
   }, []);
 
   return (
-    <div className="relative w-full h-[540px] lg:h-[660px] flex items-center justify-center select-none pointer-events-none"
+    <div className="relative w-full h-[560px] lg:h-[680px] flex items-center justify-center select-none pointer-events-none"
          style={{ overflow: "visible" }}>
       <div ref={mountRef} className="w-full h-full" style={{ overflow: "visible" }} />
     </div>
