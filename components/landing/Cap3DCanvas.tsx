@@ -28,9 +28,9 @@ export default function Cap3DCanvas() {
     const H = container.clientHeight || 700;
 
     const scene  = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 600);
-    camera.position.set(0, 0.8, 22);
-    camera.lookAt(0, -0.3, 0);
+    const camera = new THREE.PerspectiveCamera(62, W / H, 0.1, 600);
+    camera.position.set(0, 0.3, 8);
+    camera.lookAt(0, -0.4, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(W, H);
