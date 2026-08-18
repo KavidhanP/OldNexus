@@ -230,7 +230,7 @@ export default function LeadCaptureForm({ onLeadSubmitted }: LeadCaptureFormProp
         </div>
 
         {/* EMAIL ADDRESS — CRUCIAL HIGHLIGHTED FIELD */}
-        <div className="rounded-xl border border-red-500/40 bg-gradient-to-r from-red-950/30 to-black p-3.5 shadow-[0_0_15px_rgba(225,29,72,0.15)]">
+        <div className="rounded-xl border border-red-500/40 bg-red-950/20 p-3.5">
           <div className="flex items-center justify-between mb-1">
             <label className="block text-[11px] font-bold text-white uppercase tracking-wider">
               Email Address <span className="text-red-500">*</span>
@@ -344,7 +344,7 @@ export default function LeadCaptureForm({ onLeadSubmitted }: LeadCaptureFormProp
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 text-white font-bold text-sm tracking-wide shadow-[0_0_30px_rgba(225,29,72,0.5)] transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-2 group mt-2"
+          className="w-full py-3.5 px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm tracking-wide transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-2 group mt-2"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-2">

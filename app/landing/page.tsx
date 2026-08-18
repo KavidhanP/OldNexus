@@ -68,9 +68,6 @@ export default function LandingPage() {
           }}
         />
 
-        {/* Ambient Red Radial Glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-red-600/10 rounded-full blur-[120px]" />
-
         {/* Corner Target Markings (+) */}
         <div className="absolute top-6 left-6 text-neutral-700 font-mono text-xs select-none">+</div>
         <div className="absolute top-6 right-6 text-neutral-700 font-mono text-xs select-none">+</div>
